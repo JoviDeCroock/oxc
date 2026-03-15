@@ -113,6 +113,9 @@ pub struct JsxOptions {
 
     /// Fast Refresh
     pub refresh: Option<ReactRefreshOptions>,
+
+    /// React Signals
+    pub signals: Option<ReactSignalsOptions>,
 }
 
 impl Default for JsxOptions {
@@ -148,6 +151,7 @@ impl JsxOptions {
             use_built_ins: None,
             use_spread: None,
             refresh: None,
+            signals: None,
         }
     }
 
@@ -168,6 +172,44 @@ impl JsxOptions {
             use_built_ins: None,
             use_spread: None,
             refresh: None,
+            signals: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ReactSignalsMode {
+    #[default]
+    Auto,
+    Manual,
+    All,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+pub struct ReactSignalsExperimentalOptions {
+    pub debug: bool,
+    pub no_try_finally: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+/// React Signals transform configuration.
+pub struct ReactSignalsOptions {
+    pub mode: ReactSignalsMode,
+    pub import_source: Option<String>,
+    pub detect_transformed_jsx: bool,
+    pub experimental: ReactSignalsExperimentalOptions,
+}
+
+impl Default for ReactSignalsOptions {
+    fn default() -> Self {
+        Self {
+            mode: ReactSignalsMode::Auto,
+            import_source: None,
+            detect_transformed_jsx: false,
+            experimental: ReactSignalsExperimentalOptions::default(),
         }
     }
 }

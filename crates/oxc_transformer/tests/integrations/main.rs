@@ -1,4 +1,5 @@
 mod es_target;
+mod react_signals;
 mod targets;
 
 use std::path::Path;

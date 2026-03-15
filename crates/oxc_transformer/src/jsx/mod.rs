@@ -11,12 +11,17 @@ mod jsx_self;
 mod jsx_source;
 mod options;
 mod refresh;
+mod signals;
 pub use comments::update_options_with_comments;
 use display_name::ReactDisplayName;
 use jsx_impl::JsxImpl;
 use jsx_self::JsxSelf;
-pub use options::{JsxOptions, JsxRuntime, ReactRefreshOptions};
+pub use options::{
+    JsxOptions, JsxRuntime, ReactRefreshOptions, ReactSignalsExperimentalOptions, ReactSignalsMode,
+    ReactSignalsOptions,
+};
 use refresh::ReactRefresh;
+use signals::ReactSignals;
 
 /// [Preset React](https://babel.dev/docs/babel-preset-react)
 ///
@@ -30,6 +35,7 @@ pub struct Jsx<'a> {
     implementation: JsxImpl<'a>,
     display_name: ReactDisplayName,
     refresh: ReactRefresh<'a>,
+    signals: Option<ReactSignals<'a>>,
     enable_jsx_plugin: bool,
     display_name_plugin: bool,
     self_plugin: bool,
@@ -48,6 +54,7 @@ impl<'a> Jsx<'a> {
         if options.jsx_plugin || options.development {
             options.conform();
         }
+        let signals = options.signals.clone().map(|options| ReactSignals::new(&options));
         let JsxOptions {
             jsx_plugin, display_name_plugin, jsx_self_plugin, jsx_source_plugin, ..
         } = options;
@@ -61,6 +68,7 @@ impl<'a> Jsx<'a> {
             source_plugin: jsx_source_plugin,
             refresh_plugin: refresh.is_some(),
             refresh: ReactRefresh::new(&refresh.unwrap_or_default(), ast),
+            signals,
         }
     }
 }
@@ -72,6 +80,9 @@ impl<'a> Traverse<'a, TransformState<'a>> for Jsx<'a> {
         }
         if self.refresh_plugin {
             self.refresh.enter_program(program, ctx);
+        }
+        if let Some(signals) = &mut self.signals {
+            signals.enter_program(program, ctx);
         }
     }
 
@@ -98,6 +109,37 @@ impl<'a> Traverse<'a, TransformState<'a>> for Jsx<'a> {
         if self.refresh_plugin {
             self.refresh.enter_call_expression(call_expr, ctx);
         }
+        if let Some(signals) = &mut self.signals {
+            signals.enter_call_expression(call_expr, ctx);
+        }
+    }
+
+    fn enter_member_expression(
+        &mut self,
+        expr: &mut MemberExpression<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        if let Some(signals) = &mut self.signals {
+            signals.enter_member_expression(expr, ctx);
+        }
+    }
+
+    fn enter_object_pattern(&mut self, pattern: &mut ObjectPattern<'a>, ctx: &mut TraverseCtx<'a>) {
+        if let Some(signals) = &mut self.signals {
+            signals.enter_object_pattern(pattern, ctx);
+        }
+    }
+
+    fn enter_jsx_element(&mut self, node: &mut JSXElement<'a>, ctx: &mut TraverseCtx<'a>) {
+        if let Some(signals) = &mut self.signals {
+            signals.enter_jsx_element(node, ctx);
+        }
+    }
+
+    fn enter_jsx_fragment(&mut self, node: &mut JSXFragment<'a>, ctx: &mut TraverseCtx<'a>) {
+        if let Some(signals) = &mut self.signals {
+            signals.enter_jsx_fragment(node, ctx);
+        }
     }
 
     fn enter_jsx_opening_element(
@@ -122,11 +164,17 @@ impl<'a> Traverse<'a, TransformState<'a>> for Jsx<'a> {
         if self.refresh_plugin {
             self.refresh.exit_expression(expr, ctx);
         }
+        if let Some(signals) = &mut self.signals {
+            signals.exit_expression(expr, ctx);
+        }
     }
 
     fn exit_function(&mut self, func: &mut Function<'a>, ctx: &mut TraverseCtx<'a>) {
         if self.refresh_plugin {
             self.refresh.exit_function(func, ctx);
+        }
+        if let Some(signals) = &mut self.signals {
+            signals.exit_function(func, ctx);
         }
     }
 }

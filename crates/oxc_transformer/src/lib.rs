@@ -73,7 +73,10 @@ pub use crate::{
     es2021::ES2021Options,
     es2022::{ClassPropertiesOptions, ES2022Options},
     es2026::ES2026Options,
-    jsx::{JsxOptions, JsxRuntime, ReactRefreshOptions},
+    jsx::{
+        JsxOptions, JsxRuntime, ReactRefreshOptions, ReactSignalsExperimentalOptions,
+        ReactSignalsMode, ReactSignalsOptions,
+    },
     options::{
         ESFeature, ESTarget, Engine, EngineTargets, EnvOptions, Module, TransformOptions,
         babel::{BabelEnvOptions, BabelOptions},
@@ -319,6 +322,21 @@ impl<'a> Traverse<'a, TransformState<'a>> for TransformerImpl<'a> {
         self.x1_jsx.enter_call_expression(expr, ctx);
     }
 
+    fn enter_member_expression(
+        &mut self,
+        expr: &mut MemberExpression<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        self.x1_jsx.enter_member_expression(expr, ctx);
+    }
+
+    fn enter_object_pattern(&mut self, pattern: &mut ObjectPattern<'a>, ctx: &mut TraverseCtx<'a>) {
+        if let Some(typescript) = self.x0_typescript.as_mut() {
+            typescript.enter_object_pattern(pattern, ctx);
+        }
+        self.x1_jsx.enter_object_pattern(pattern, ctx);
+    }
+
     fn enter_chain_element(&mut self, element: &mut ChainElement<'a>, ctx: &mut TraverseCtx<'a>) {
         if let Some(typescript) = self.x0_typescript.as_mut() {
             typescript.enter_chain_element(element, ctx);
@@ -455,6 +473,7 @@ impl<'a> Traverse<'a, TransformState<'a>> for TransformerImpl<'a> {
         if let Some(typescript) = self.x0_typescript.as_mut() {
             typescript.enter_jsx_element(node, ctx);
         }
+        self.x1_jsx.enter_jsx_element(node, ctx);
     }
 
     fn enter_jsx_element_name(&mut self, node: &mut JSXElementName<'a>, ctx: &mut TraverseCtx<'a>) {
@@ -473,6 +492,7 @@ impl<'a> Traverse<'a, TransformState<'a>> for TransformerImpl<'a> {
         if let Some(typescript) = self.x0_typescript.as_mut() {
             typescript.enter_jsx_fragment(node, ctx);
         }
+        self.x1_jsx.enter_jsx_fragment(node, ctx);
     }
 
     fn enter_jsx_opening_element(

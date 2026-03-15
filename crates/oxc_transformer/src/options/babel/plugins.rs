@@ -1,8 +1,11 @@
 use serde::Deserialize;
 
 use crate::{
-    DecoratorOptions, TypeScriptOptions, es2015::ArrowFunctionsOptions,
-    es2018::ObjectRestSpreadOptions, es2022::ClassPropertiesOptions, jsx::JsxOptions,
+    DecoratorOptions, TypeScriptOptions,
+    es2015::ArrowFunctionsOptions,
+    es2018::ObjectRestSpreadOptions,
+    es2022::ClassPropertiesOptions,
+    jsx::{JsxOptions, ReactSignalsOptions},
     plugins::StyledComponentsOptions,
 };
 
@@ -38,6 +41,7 @@ pub struct BabelPlugins {
     // jsx
     pub react_jsx: Option<JsxOptions>,
     pub react_jsx_dev: Option<JsxOptions>,
+    pub react_signals: Option<ReactSignalsOptions>,
     pub react_jsx_self: bool,
     pub react_jsx_source: bool,
     pub react_display_name: bool,
@@ -123,6 +127,10 @@ impl TryFrom<PluginPresetEntries> for BabelPlugins {
                 "transform-react-jsx-development" => {
                     p.react_jsx_dev =
                         entry.value::<JsxOptions>().map_err(|err| p.errors.push(err)).ok();
+                }
+                "transform-react-signals" | "@preact/signals-react-transform" => {
+                    p.react_signals =
+                        entry.value::<ReactSignalsOptions>().map_err(|err| p.errors.push(err)).ok();
                 }
                 "transform-react-display-name" => p.react_display_name = true,
                 "transform-react-jsx-self" => p.react_jsx_self = true,

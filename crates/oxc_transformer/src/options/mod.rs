@@ -165,7 +165,7 @@ impl TryFrom<&BabelOptions> for TransformOptions {
                 .is_some_and(|o| o.emit_decorator_metadata),
         };
 
-        let jsx = if let Some(options) = &options.presets.jsx {
+        let mut jsx = if let Some(options) = &options.presets.jsx {
             options.clone()
         } else {
             let mut jsx_options = if let Some(options) = &options.plugins.react_jsx_dev {
@@ -180,8 +180,12 @@ impl TryFrom<&BabelOptions> for TransformOptions {
             jsx_options.display_name_plugin = options.plugins.react_display_name;
             jsx_options.jsx_self_plugin = options.plugins.react_jsx_self;
             jsx_options.jsx_source_plugin = options.plugins.react_jsx_source;
+            jsx_options.signals = options.plugins.react_signals.clone();
             jsx_options
         };
+        if jsx.signals.is_none() {
+            jsx.signals = options.plugins.react_signals.clone();
+        }
 
         let env = options.presets.env.unwrap_or_default();
 
