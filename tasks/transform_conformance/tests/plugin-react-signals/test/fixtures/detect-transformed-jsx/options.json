@@ -1,0 +1,11 @@
+{
+  "sourceType": "module",
+  "plugins": [
+    [
+      "@preact/signals-react-transform",
+      {
+        "detectTransformedJsx": true
+      }
+    ]
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "sourceType": "module",
+  "plugins": [
+    "syntax-jsx",
+    [
+      "@preact/signals-react-transform",
+      {
+        "importSource": "custom-source"
+      }
+    ]
+  ]
+}

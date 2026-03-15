@@ -63,6 +63,7 @@ pub const PLUGINS: &[&str] = &[
     // Legacy decorators, tests almost ported from TypeScript
     "legacy-decorators",
     // Built-in third-party plugins
+    "plugin-react-signals",
     "plugin-styled-components",
     "plugin-tagged-template-transform",
 ];
