@@ -111,8 +111,11 @@ pub struct JsxOptions {
     /// This value is used to skip Babel tests, and is not used in oxc.
     pub use_spread: Option<bool>,
 
-    /// Fast Refresh
+    /// React Fast Refresh
     pub refresh: Option<ReactRefreshOptions>,
+
+    /// Prefresh
+    pub prefresh: Option<PrefreshOptions>,
 }
 
 impl Default for JsxOptions {
@@ -148,6 +151,7 @@ impl JsxOptions {
             use_built_ins: None,
             use_spread: None,
             refresh: None,
+            prefresh: None,
         }
     }
 
@@ -168,6 +172,7 @@ impl JsxOptions {
             use_built_ins: None,
             use_spread: None,
             refresh: None,
+            prefresh: None,
         }
     }
 }
@@ -204,6 +209,33 @@ pub struct ReactRefreshOptions {
 }
 
 impl Default for ReactRefreshOptions {
+    fn default() -> Self {
+        Self {
+            refresh_reg: default_refresh_reg(),
+            refresh_sig: default_refresh_sig(),
+            emit_full_signatures: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+/// Prefresh transform configuration.
+pub struct PrefreshOptions {
+    /// Specify the identifier of the refresh registration variable.
+    #[serde(default = "default_refresh_reg")]
+    pub refresh_reg: String,
+
+    /// Specify the identifier of the refresh signature variable.
+    #[serde(default = "default_refresh_sig")]
+    pub refresh_sig: String,
+
+    /// Controls whether to emit full signatures or use a more compact representation.
+    #[serde(default)]
+    pub emit_full_signatures: bool,
+}
+
+impl Default for PrefreshOptions {
     fn default() -> Self {
         Self {
             refresh_reg: default_refresh_reg(),

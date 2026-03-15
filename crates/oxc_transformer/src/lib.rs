@@ -73,7 +73,7 @@ pub use crate::{
     es2021::ES2021Options,
     es2022::{ClassPropertiesOptions, ES2022Options},
     es2026::ES2026Options,
-    jsx::{JsxOptions, JsxRuntime, ReactRefreshOptions},
+    jsx::{JsxOptions, JsxRuntime, PrefreshOptions, ReactRefreshOptions},
     options::{
         ESFeature, ESTarget, Engine, EngineTargets, EnvOptions, Module, TransformOptions,
         babel::{BabelEnvOptions, BabelOptions},

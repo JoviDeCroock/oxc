@@ -10,13 +10,61 @@ mod jsx_impl;
 mod jsx_self;
 mod jsx_source;
 mod options;
+mod prefresh;
 mod refresh;
 pub use comments::update_options_with_comments;
 use display_name::ReactDisplayName;
 use jsx_impl::JsxImpl;
 use jsx_self::JsxSelf;
-pub use options::{JsxOptions, JsxRuntime, ReactRefreshOptions};
+pub use options::{JsxOptions, JsxRuntime, PrefreshOptions, ReactRefreshOptions};
+use prefresh::Prefresh;
 use refresh::ReactRefresh;
+
+enum RefreshTransform<'a> {
+    React(ReactRefresh<'a>),
+    Prefresh(Prefresh<'a>),
+}
+
+impl<'a> RefreshTransform<'a> {
+    fn enter_program(&mut self, program: &mut Program<'a>, ctx: &mut TraverseCtx<'a>) {
+        match self {
+            Self::React(refresh) => refresh.enter_program(program, ctx),
+            Self::Prefresh(refresh) => refresh.enter_program(program, ctx),
+        }
+    }
+
+    fn exit_program(&mut self, program: &mut Program<'a>, ctx: &mut TraverseCtx<'a>) {
+        match self {
+            Self::React(refresh) => refresh.exit_program(program, ctx),
+            Self::Prefresh(refresh) => refresh.exit_program(program, ctx),
+        }
+    }
+
+    fn enter_call_expression(
+        &mut self,
+        call_expr: &mut CallExpression<'a>,
+        ctx: &mut TraverseCtx<'a>,
+    ) {
+        match self {
+            Self::React(refresh) => refresh.enter_call_expression(call_expr, ctx),
+            Self::Prefresh(refresh) => refresh.enter_call_expression(call_expr, ctx),
+        }
+    }
+
+    fn exit_expression(&mut self, expr: &mut Expression<'a>, ctx: &mut TraverseCtx<'a>) {
+        match self {
+            Self::React(refresh) => refresh.exit_expression(expr, ctx),
+            Self::Prefresh(refresh) => refresh.exit_expression(expr, ctx),
+        }
+    }
+
+    fn exit_function(&mut self, func: &mut Function<'a>, ctx: &mut TraverseCtx<'a>) {
+        match self {
+            Self::React(refresh) => refresh.exit_function(func, ctx),
+            Self::Prefresh(refresh) => refresh.exit_function(func, ctx),
+        }
+    }
+}
 
 /// [Preset React](https://babel.dev/docs/babel-preset-react)
 ///
@@ -29,12 +77,11 @@ use refresh::ReactRefresh;
 pub struct Jsx<'a> {
     implementation: JsxImpl<'a>,
     display_name: ReactDisplayName,
-    refresh: ReactRefresh<'a>,
+    refresh: Option<RefreshTransform<'a>>,
     enable_jsx_plugin: bool,
     display_name_plugin: bool,
     self_plugin: bool,
     source_plugin: bool,
-    refresh_plugin: bool,
 }
 
 // Constructors
@@ -48,10 +95,19 @@ impl<'a> Jsx<'a> {
         if options.jsx_plugin || options.development {
             options.conform();
         }
+        let refresh = options
+            .prefresh
+            .clone()
+            .map(|options| RefreshTransform::Prefresh(Prefresh::new(&options, ast)))
+            .or_else(|| {
+                options
+                    .refresh
+                    .clone()
+                    .map(|options| RefreshTransform::React(ReactRefresh::new(&options, ast)))
+            });
         let JsxOptions {
             jsx_plugin, display_name_plugin, jsx_self_plugin, jsx_source_plugin, ..
         } = options;
-        let refresh = options.refresh.clone();
         Self {
             implementation: JsxImpl::new(options, object_rest_spread_options, ast, source_type),
             display_name: ReactDisplayName::new(),
@@ -59,8 +115,7 @@ impl<'a> Jsx<'a> {
             display_name_plugin,
             self_plugin: jsx_self_plugin,
             source_plugin: jsx_source_plugin,
-            refresh_plugin: refresh.is_some(),
-            refresh: ReactRefresh::new(&refresh.unwrap_or_default(), ast),
+            refresh,
         }
     }
 }
@@ -70,14 +125,14 @@ impl<'a> Traverse<'a, TransformState<'a>> for Jsx<'a> {
         if self.enable_jsx_plugin {
             program.source_type = program.source_type.with_standard(true);
         }
-        if self.refresh_plugin {
-            self.refresh.enter_program(program, ctx);
+        if let Some(refresh) = &mut self.refresh {
+            refresh.enter_program(program, ctx);
         }
     }
 
     fn exit_program(&mut self, program: &mut Program<'a>, ctx: &mut TraverseCtx<'a>) {
-        if self.refresh_plugin {
-            self.refresh.exit_program(program, ctx);
+        if let Some(refresh) = &mut self.refresh {
+            refresh.exit_program(program, ctx);
         }
         if self.enable_jsx_plugin {
             self.implementation.exit_program(program, ctx);
@@ -95,8 +150,8 @@ impl<'a> Traverse<'a, TransformState<'a>> for Jsx<'a> {
             self.display_name.enter_call_expression(call_expr, ctx);
         }
 
-        if self.refresh_plugin {
-            self.refresh.enter_call_expression(call_expr, ctx);
+        if let Some(refresh) = &mut self.refresh {
+            refresh.enter_call_expression(call_expr, ctx);
         }
     }
 
@@ -119,14 +174,14 @@ impl<'a> Traverse<'a, TransformState<'a>> for Jsx<'a> {
         if self.enable_jsx_plugin {
             self.implementation.exit_expression(expr, ctx);
         }
-        if self.refresh_plugin {
-            self.refresh.exit_expression(expr, ctx);
+        if let Some(refresh) = &mut self.refresh {
+            refresh.exit_expression(expr, ctx);
         }
     }
 
     fn exit_function(&mut self, func: &mut Function<'a>, ctx: &mut TraverseCtx<'a>) {
-        if self.refresh_plugin {
-            self.refresh.exit_function(func, ctx);
+        if let Some(refresh) = &mut self.refresh {
+            refresh.exit_function(func, ctx);
         }
     }
 }

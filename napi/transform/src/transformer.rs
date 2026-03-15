@@ -571,6 +571,13 @@ pub struct JsxOptions {
     ///
     /// @default false
     pub refresh: Option<Either<bool, ReactRefreshOptions>>,
+
+    /// Enable Prefresh.
+    ///
+    /// Conforms to the implementation in {@link https://github.com/preactjs/prefresh/tree/main/packages/babel}
+    ///
+    /// @default false
+    pub prefresh: Option<Either<bool, PrefreshOptions>>,
 }
 
 impl From<JsxOptions> for oxc::transformer::JsxOptions {
@@ -592,6 +599,10 @@ impl From<JsxOptions> for oxc::transformer::JsxOptions {
             refresh: options.refresh.and_then(|value| match value {
                 Either::A(b) => b.then(oxc::transformer::ReactRefreshOptions::default),
                 Either::B(options) => Some(oxc::transformer::ReactRefreshOptions::from(options)),
+            }),
+            prefresh: options.prefresh.and_then(|value| match value {
+                Either::A(b) => b.then(oxc::transformer::PrefreshOptions::default),
+                Either::B(options) => Some(oxc::transformer::PrefreshOptions::from(options)),
             }),
             ..Default::default()
         }
@@ -617,6 +628,32 @@ impl From<ReactRefreshOptions> for oxc::transformer::ReactRefreshOptions {
     fn from(options: ReactRefreshOptions) -> Self {
         let ops = oxc::transformer::ReactRefreshOptions::default();
         oxc::transformer::ReactRefreshOptions {
+            refresh_reg: options.refresh_reg.unwrap_or(ops.refresh_reg),
+            refresh_sig: options.refresh_sig.unwrap_or(ops.refresh_sig),
+            emit_full_signatures: options.emit_full_signatures.unwrap_or(ops.emit_full_signatures),
+        }
+    }
+}
+
+#[napi(object)]
+pub struct PrefreshOptions {
+    /// Specify the identifier of the refresh registration variable.
+    ///
+    /// @default `$RefreshReg$`.
+    pub refresh_reg: Option<String>,
+
+    /// Specify the identifier of the refresh signature variable.
+    ///
+    /// @default `$RefreshSig$`.
+    pub refresh_sig: Option<String>,
+
+    pub emit_full_signatures: Option<bool>,
+}
+
+impl From<PrefreshOptions> for oxc::transformer::PrefreshOptions {
+    fn from(options: PrefreshOptions) -> Self {
+        let ops = oxc::transformer::PrefreshOptions::default();
+        oxc::transformer::PrefreshOptions {
             refresh_reg: options.refresh_reg.unwrap_or(ops.refresh_reg),
             refresh_sig: options.refresh_sig.unwrap_or(ops.refresh_sig),
             emit_full_signatures: options.emit_full_signatures.unwrap_or(ops.emit_full_signatures),
