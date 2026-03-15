@@ -69,6 +69,21 @@ fn transforms_custom_hooks_in_auto_mode() {
 }
 
 #[test]
+fn detects_signal_destructuring_in_auto_mode() {
+    let output = transform(
+        "function MyComponent() { const { value } = signal; return <div>{value}</div>; }",
+        SourceType::jsx().with_module(true),
+        "Component.jsx",
+        ReactSignalsOptions::default(),
+    );
+
+    assert_eq!(
+        output,
+        "import { useSignals as _useSignals } from '@preact/signals-react/runtime';\nfunction MyComponent() {\n\tvar _effect = _useSignals(1);\n\ttry {\n\t\tconst { value } = signal;\n\t\treturn <div>{value}</div>;\n\t} finally {\n\t\t_effect.f();\n\t}\n}\n"
+    );
+}
+
+#[test]
 fn supports_manual_opt_in_for_unmanaged_functions() {
     let output = transform(
         "/* @useSignals */ function render() { return signal.value; }",
@@ -80,6 +95,36 @@ fn supports_manual_opt_in_for_unmanaged_functions() {
     assert_eq!(
         output,
         "import { useSignals as _useSignals } from '@preact/signals-react/runtime';\n/* @useSignals */ function render() {\n\t_useSignals();\n\treturn signal.value;\n}\n"
+    );
+}
+
+#[test]
+fn opt_out_comment_wins_over_opt_in() {
+    let output = transform(
+        "/** @noUseSignals @useSignals */ function MyComponent() { signal.value; return <div>Hello</div>; }",
+        SourceType::jsx().with_module(true),
+        "Component.jsx",
+        ReactSignalsOptions::default(),
+    );
+
+    assert_eq!(
+        output,
+        "/** @noUseSignals @useSignals */ function MyComponent() {\n\tsignal.value;\n\treturn <div>Hello</div>;\n}\n"
+    );
+}
+
+#[test]
+fn transforms_components_without_signal_reads_in_all_mode() {
+    let output = transform(
+        "function MyComponent() { return <div>Hello</div>; }",
+        SourceType::jsx().with_module(true),
+        "Component.jsx",
+        ReactSignalsOptions { mode: ReactSignalsMode::All, ..ReactSignalsOptions::default() },
+    );
+
+    assert_eq!(
+        output,
+        "import { useSignals as _useSignals } from '@preact/signals-react/runtime';\nfunction MyComponent() {\n\tvar _effect = _useSignals(1);\n\ttry {\n\t\treturn <div>Hello</div>;\n\t} finally {\n\t\t_effect.f();\n\t}\n}\n"
     );
 }
 
@@ -105,6 +150,24 @@ fn supports_no_try_finally_mode() {
 }
 
 #[test]
+fn supports_custom_import_source() {
+    let output = transform(
+        "function MyComponent() { signal.value; return <div>Hello</div>; }",
+        SourceType::jsx().with_module(true),
+        "Component.jsx",
+        ReactSignalsOptions {
+            import_source: Some(String::from("custom-source")),
+            ..ReactSignalsOptions::default()
+        },
+    );
+
+    assert_eq!(
+        output,
+        "import { useSignals as _useSignals } from 'custom-source';\nfunction MyComponent() {\n\tvar _effect = _useSignals(1);\n\ttry {\n\t\tsignal.value;\n\t\treturn <div>Hello</div>;\n\t} finally {\n\t\t_effect.f();\n\t}\n}\n"
+    );
+}
+
+#[test]
 fn detects_pretransformed_jsx_calls() {
     let output = transform(
         "import { jsx as _jsx } from 'react/jsx-runtime'; function MyComponent() { signal.value; return _jsx('div', { children: 'Hello' }); }",
@@ -116,6 +179,43 @@ fn detects_pretransformed_jsx_calls() {
     assert_eq!(
         output,
         "import { jsx as _jsx } from 'react/jsx-runtime';\nimport { useSignals as _useSignals } from '@preact/signals-react/runtime';\nfunction MyComponent() {\n\tvar _effect = _useSignals(1);\n\ttry {\n\t\tsignal.value;\n\t\treturn _jsx('div', { children: 'Hello' });\n\t} finally {\n\t\t_effect.f();\n\t}\n}\n"
+    );
+}
+
+#[test]
+fn detects_react_create_element_calls() {
+    let output = transform(
+        "import React from 'react'; function MyComponent() { signal.value; return React.createElement('div', null, 'Hello'); }",
+        SourceType::mjs(),
+        "Component.js",
+        ReactSignalsOptions { detect_transformed_jsx: true, ..ReactSignalsOptions::default() },
+    );
+
+    assert_eq!(
+        output,
+        "import React from 'react';\nimport { useSignals as _useSignals } from '@preact/signals-react/runtime';\nfunction MyComponent() {\n\tvar _effect = _useSignals(1);\n\ttry {\n\t\tsignal.value;\n\t\treturn React.createElement('div', null, 'Hello');\n\t} finally {\n\t\t_effect.f();\n\t}\n}\n"
+    );
+}
+
+#[test]
+fn adds_debug_metadata_for_signals() {
+    let output = transform(
+        "function MyComponent() { const count = signal(0); return <div>{count.value}</div>; }",
+        SourceType::jsx().with_module(true),
+        "Component.jsx",
+        ReactSignalsOptions {
+            experimental: ReactSignalsExperimentalOptions {
+                debug: true,
+                ..ReactSignalsExperimentalOptions::default()
+            },
+            ..ReactSignalsOptions::default()
+        },
+    );
+
+    assert!(output.contains("var _effect = _useSignals(1, 'MyComponent');"), "{output}");
+    assert!(
+        output.contains("const count = signal(0, { name: 'count (Component.jsx:1)' });"),
+        "{output}"
     );
 }
 
