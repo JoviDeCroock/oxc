@@ -1,0 +1,70 @@
+---
+source: crates/oxc_linter/src/tester.rs
+assertion_line: 490
+---
+
+  ⚠ typescript(member-ordering): Member new should be declared before all field definitions.
+   ╭─[member_ordering.tsx:1:28]
+ 1 │ interface Foo { b: string; new (): Foo; a(): void; [z: string]: unknown; }
+   ·                            ────────────
+   ╰────
+
+  ⚠ typescript(member-ordering): Member a should be declared before all field definitions.
+   ╭─[member_ordering.tsx:1:41]
+ 1 │ interface Foo { b: string; new (): Foo; a(): void; [z: string]: unknown; }
+   ·                                         ──────────
+   ╰────
+
+  ⚠ typescript(member-ordering): Member z should be declared before all field definitions.
+   ╭─[member_ordering.tsx:1:52]
+ 1 │ interface Foo { b: string; new (): Foo; a(): void; [z: string]: unknown; }
+   ·                                                    ─────────────────────
+   ╰────
+
+  ⚠ typescript(member-ordering): Member a should be declared before all field definitions.
+   ╭─[member_ordering.tsx:1:25]
+ 1 │ type Foo = { b: string; a(): void; new (): Foo; [z: string]: unknown; };
+   ·                         ──────────
+   ╰────
+
+  ⚠ typescript(member-ordering): Member new should be declared before all field definitions.
+   ╭─[member_ordering.tsx:1:36]
+ 1 │ type Foo = { b: string; a(): void; new (): Foo; [z: string]: unknown; };
+   ·                                    ────────────
+   ╰────
+
+  ⚠ typescript(member-ordering): Member z should be declared before all field definitions.
+   ╭─[member_ordering.tsx:1:49]
+ 1 │ type Foo = { b: string; a(): void; new (): Foo; [z: string]: unknown; };
+   ·                                                 ─────────────────────
+   ╰────
+
+  ⚠ typescript(member-ordering): Member constructor should be declared before all public instance method definitions.
+   ╭─[member_ordering.tsx:1:20]
+ 1 │ class Foo { c() {} constructor() {} b: string; }
+   ·                    ────────────────
+   ╰────
+
+  ⚠ typescript(member-ordering): Member b should be declared before all public instance method definitions.
+   ╭─[member_ordering.tsx:1:37]
+ 1 │ class Foo { c() {} constructor() {} b: string; }
+   ·                                     ──────────
+   ╰────
+
+  ⚠ typescript(member-ordering): Member b should be declared before all public static method definitions.
+   ╭─[member_ordering.tsx:1:34]
+ 1 │ class Foo { public static a() {} public static b: string; }
+   ·                                  ────────────────────────
+   ╰────
+
+  ⚠ typescript(member-ordering): Member a should be declared before member b.
+   ╭─[member_ordering.tsx:1:28]
+ 1 │ interface Foo { b(): void; a: string; }
+   ·                            ──────────
+   ╰────
+
+  ⚠ typescript(member-ordering): Member b should be declared after all required members.
+   ╭─[member_ordering.tsx:1:28]
+ 1 │ interface Foo { a: string; b?: string; c: string; }
+   ·                            ───────────
+   ╰────
