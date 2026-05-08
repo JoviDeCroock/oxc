@@ -39,6 +39,11 @@ pub struct ConfigStoreBuilder {
     categories: OxlintCategories,
     overrides: OxlintOverrides,
 
+    // Rules from the merged `Oxlintrc` (i.e. after `extends`/`extends_configs` are
+    // resolved). Captured so `resolve_final_config_file` can preserve per-rule
+    // option arrays inherited via `extends` in `--print-config` output.
+    inherited_rules: OxlintRules,
+
     // Collect all `extends` file paths for the language server.
     // The server will tell the clients to watch for the extends files.
     pub extended_paths: Vec<PathBuf>,
@@ -61,9 +66,18 @@ impl ConfigStoreBuilder {
         let external_rules = FxHashMap::default();
         let categories: OxlintCategories = OxlintCategories::default();
         let overrides = OxlintOverrides::default();
+        let inherited_rules = OxlintRules::default();
         let extended_paths = Vec::new();
 
-        Self { rules, external_rules, config, categories, overrides, extended_paths }
+        Self {
+            rules,
+            external_rules,
+            config,
+            categories,
+            overrides,
+            inherited_rules,
+            extended_paths,
+        }
     }
 
     /// Warn on all rules in all plugins and categories, including those in `nursery`.
@@ -76,8 +90,17 @@ impl ConfigStoreBuilder {
         let categories: OxlintCategories = OxlintCategories::default();
         let rules = RULES.iter().map(|rule| (rule.clone(), AllowWarnDeny::Warn)).collect();
         let external_rules = FxHashMap::default();
+        let inherited_rules = OxlintRules::default();
         let extended_paths = Vec::new();
-        Self { rules, external_rules, config, categories, overrides, extended_paths }
+        Self {
+            rules,
+            external_rules,
+            config,
+            categories,
+            overrides,
+            inherited_rules,
+            extended_paths,
+        }
     }
 
     /// Create a [`ConfigStoreBuilder`] from a loaded or manually built [`Oxlintrc`].
@@ -273,6 +296,7 @@ impl ConfigStoreBuilder {
             config,
             categories,
             overrides: oxlintrc.overrides,
+            inherited_rules: oxlintrc.rules.clone(),
             extended_paths,
         };
 
@@ -561,7 +585,15 @@ impl ConfigStoreBuilder {
     /// This function will panic if the `oxlintrc` is not valid JSON.
     pub fn resolve_final_config_file(&self, oxlintrc: Oxlintrc) -> String {
         let mut oxlintrc = oxlintrc;
-        let previous_rules = std::mem::take(&mut oxlintrc.rules);
+        // Prefer the merged rules captured by `from_oxlintrc` (which include rules
+        // inherited via `extends` / `extends_configs`) over the input `oxlintrc.rules`,
+        // which only carries the root-level config and would drop per-rule options
+        // for any rule originating from an extended config.
+        let previous_rules = if self.inherited_rules.is_empty() {
+            std::mem::take(&mut oxlintrc.rules)
+        } else {
+            self.inherited_rules.clone()
+        };
 
         let rule_name_to_rule = previous_rules
             .rules
@@ -1669,6 +1701,78 @@ mod test {
         let err = builder.build(&mut external_plugin_store).unwrap_err();
 
         assert_eq!(err.to_string(), "Rule 'no-console-typo' not found in plugin 'eslint'");
+    }
+
+    // https://github.com/oxc-project/oxc/issues/22230
+    //
+    // When a config pulls in another config object via `extends_configs` (the
+    // object-form `extends` produced by `oxlint.config.ts`), `--print-config`
+    // used to drop the per-rule option arrays for any rule that originated
+    // from an extended config. Verify that options survive across a triply
+    // nested chain (grandparent <- parent <- child <- root).
+    #[test]
+    fn test_resolve_final_config_file_preserves_options_through_triple_extends() {
+        let grandparent: Oxlintrc = serde_json::from_value(serde_json::json!({
+            "rules": {
+                "no-console": ["error", { "allow": ["info", "warn"] }],
+                "no-debugger": "error",
+            },
+        }))
+        .unwrap();
+
+        let mut parent: Oxlintrc = serde_json::from_value(serde_json::json!({
+            "rules": {
+                "eqeqeq": ["error", "smart"],
+            },
+        }))
+        .unwrap();
+        parent.extends_configs = vec![grandparent];
+
+        let mut child: Oxlintrc = serde_json::from_value(serde_json::json!({
+            "rules": {
+                "getter-return": ["error", { "allowImplicit": true }],
+            },
+        }))
+        .unwrap();
+        child.extends_configs = vec![parent];
+
+        // Mirrors the issue's `oxlint.config.ts`: only `extends` at the root,
+        // no rules defined directly on the top-level config.
+        let mut root: Oxlintrc = serde_json::from_value(serde_json::json!({})).unwrap();
+        root.extends_configs = vec![child];
+
+        let mut external_plugin_store = ExternalPluginStore::default();
+        let builder = ConfigStoreBuilder::from_oxlintrc(
+            true,
+            root.clone(),
+            None,
+            &mut external_plugin_store,
+            None,
+        )
+        .unwrap();
+
+        let printed = builder.resolve_final_config_file(root);
+        let parsed: serde_json::Value = serde_json::from_str(&printed).unwrap();
+        let rules = parsed.get("rules").and_then(|r| r.as_object()).expect("rules object missing");
+
+        // Each level of the chain contributes at least one rule with options.
+        assert_eq!(
+            rules.get("no-console").unwrap(),
+            &serde_json::json!(["deny", [{ "allow": ["info", "warn"] }]]),
+            "options for `no-console` (defined three levels deep) should round-trip"
+        );
+        assert_eq!(
+            rules.get("eqeqeq").unwrap(),
+            &serde_json::json!(["deny", ["smart"]]),
+            "options for `eqeqeq` (defined two levels deep) should round-trip"
+        );
+        assert_eq!(
+            rules.get("getter-return").unwrap(),
+            &serde_json::json!(["deny", [{ "allowImplicit": true }]]),
+            "options for `getter-return` (defined one level deep) should round-trip"
+        );
+        // Severity-only rules stay severity-only.
+        assert_eq!(rules.get("no-debugger").unwrap(), &serde_json::json!("deny"));
     }
 
     fn config_store_from_path(path: &str) -> Config {
