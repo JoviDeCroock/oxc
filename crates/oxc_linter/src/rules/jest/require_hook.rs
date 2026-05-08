@@ -498,6 +498,13 @@ test('works', () => {});",
                     None,
                     Some(PathBuf::from("city.e2e.ts")),
                 ),
+                (
+                    "setup();
+beforeEach(() => {});",
+                    None,
+                    None,
+                    Some(PathBuf::from("setupTests.ts")),
+                ),
             ])
             .collect();
 

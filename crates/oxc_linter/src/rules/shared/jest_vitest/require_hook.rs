@@ -20,8 +20,22 @@ use crate::{
     },
 };
 
-const TEST_FRAMEWORK_GLOBALS: [&str; 10] =
-    ["bench", "describe", "fdescribe", "fit", "it", "suite", "test", "xdescribe", "xit", "xtest"];
+const TEST_FRAMEWORK_GLOBALS: [&str; 14] = [
+    "afterAll",
+    "afterEach",
+    "beforeAll",
+    "beforeEach",
+    "bench",
+    "describe",
+    "fdescribe",
+    "fit",
+    "it",
+    "suite",
+    "test",
+    "xdescribe",
+    "xit",
+    "xtest",
+];
 
 fn use_hook(span: Span) -> OxcDiagnostic {
     OxcDiagnostic::warn("Require setup and teardown code to be within a hook.")

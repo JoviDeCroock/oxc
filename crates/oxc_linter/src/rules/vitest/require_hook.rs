@@ -807,6 +807,13 @@ test('works', () => {});",
         None,
         Some(PathBuf::from("city.e2e.ts")),
     ));
+    fail.push((
+        "setup();
+beforeEach(() => {});",
+        None,
+        None,
+        Some(PathBuf::from("setupTests.ts")),
+    ));
 
     Tester::new(RequireHook::NAME, RequireHook::PLUGIN, pass, fail)
         .with_vitest_plugin(true)
