@@ -75,6 +75,18 @@ source: crates/oxc_linter/src/tester.rs
    ╰────
 
   ⚠ eslint(consistent-this): Designated alias 'self' is not assigned to 'this'.
+   ╭─[consistent_this.tsx:1:15]
+ 1 │ var self; var self = 42
+   ·               ─────────
+   ╰────
+
+  ⚠ eslint(consistent-this): Designated alias 'self' is not assigned to 'this'.
+   ╭─[consistent_this.tsx:1:5]
+ 1 │ var self = 42; var self
+   ·     ─────────
+   ╰────
+
+  ⚠ eslint(consistent-this): Designated alias 'self' is not assigned to 'this'.
    ╭─[consistent_this.tsx:1:5]
  1 │ var self; (function() { self = this; }())
    ·     ────

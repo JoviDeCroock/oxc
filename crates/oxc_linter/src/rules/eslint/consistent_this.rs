@@ -139,6 +139,16 @@ impl ConsistentThis {
         let scoping = ctx.scoping();
         let decl_scope = scoping.symbol_scope_id(symbol_id);
 
+        let has_initialized_declaration = scoping.symbol_declarations(symbol_id).any(|node_id| {
+            matches!(
+                ctx.nodes().kind(node_id),
+                AstKind::VariableDeclarator(decl) if decl.init.is_some()
+            )
+        });
+        if has_initialized_declaration {
+            return;
+        }
+
         let assigned_to_this_in_scope =
             scoping.get_resolved_references(symbol_id).any(|reference| {
                 if !reference.is_write() || reference.scope_id() != decl_scope {
@@ -193,6 +203,8 @@ fn test() {
         ("self = 42", Some(serde_json::json!(["that"]))),
         ("var foo = {}; foo.bar = this", Some(serde_json::json!(["self"]))),
         ("var self = this; var vm = this;", Some(serde_json::json!(["self", "vm"]))),
+        ("var self; var self = this", Some(serde_json::json!(["self"]))),
+        ("var self = this; var self", Some(serde_json::json!(["self"]))),
     ];
 
     let fail = vec![
@@ -207,6 +219,8 @@ fn test() {
         ("that = this", Some(serde_json::json!(["self"]))),
         ("self = this", Some(serde_json::json!(["that"]))),
         ("self += this", Some(serde_json::json!(["self"]))),
+        ("var self; var self = 42", Some(serde_json::json!(["self"]))),
+        ("var self = 42; var self", Some(serde_json::json!(["self"]))),
         ("var self; (function() { self = this; }())", Some(serde_json::json!(["self"]))),
         ("var self; (function() { self = this; }())", Some(serde_json::json!(["self"]))), // { "ecmaVersion": 6, "sourceType": "module" }
     ];
