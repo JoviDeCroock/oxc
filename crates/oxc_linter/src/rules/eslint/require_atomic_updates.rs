@@ -2,10 +2,11 @@ use oxc_ast::{
     AstKind,
     ast::{
         ArrowFunctionExpression, AssignmentExpression, AssignmentOperator, AssignmentTarget,
-        AssignmentTargetMaybeDefault, AssignmentTargetProperty, AwaitExpression,
-        ConditionalExpression, Expression, ForInStatement, ForOfStatement, ForStatement,
-        ForStatementLeft, FormalParameters, Function, FunctionBody, IdentifierReference,
-        IfStatement, LogicalExpression, MemberExpression, Statement, WhileStatement,
+        AssignmentTargetMaybeDefault, AssignmentTargetProperty, AwaitExpression, BreakStatement,
+        ConditionalExpression, ContinueStatement, DoWhileStatement, Expression, ForInStatement,
+        ForOfStatement, ForStatement, ForStatementLeft, FormalParameters, Function, FunctionBody,
+        IdentifierReference, IfStatement, LabeledStatement, LogicalExpression, MemberExpression,
+        ReturnStatement, Statement, SwitchStatement, ThrowStatement, TryStatement, WhileStatement,
         YieldExpression,
     },
 };
@@ -105,7 +106,6 @@ impl Rule for RequireAtomicUpdates {
     }
 
     fn run<'a>(&self, node: &AstNode<'a>, ctx: &LintContext<'a>) {
-        let allow_properties = self.0.allow_properties;
         match node.kind() {
             AstKind::Function(func) => {
                 if !(func.r#async || func.generator) {
@@ -113,14 +113,14 @@ impl Rule for RequireAtomicUpdates {
                 }
                 let Some(body) = func.body.as_ref() else { return };
                 let scope_id = func.scope_id();
-                run_analysis(ctx, scope_id, &func.params, body, allow_properties);
+                run_analysis(ctx, scope_id, &func.params, body, self.0.allow_properties);
             }
             AstKind::ArrowFunctionExpression(arrow) => {
                 if !arrow.r#async {
                     return;
                 }
                 let scope_id = arrow.scope_id();
-                run_analysis(ctx, scope_id, &arrow.params, &arrow.body, allow_properties);
+                run_analysis(ctx, scope_id, &arrow.params, &arrow.body, self.0.allow_properties);
             }
             _ => {}
         }
@@ -144,6 +144,12 @@ fn run_analysis<'a>(
         parameter_symbols,
         allow_properties,
         state: State::default(),
+        break_targets: Vec::new(),
+        continue_targets: Vec::new(),
+        pending_loop_label: None,
+        abrupt_states: Vec::new(),
+        finally_contexts: Vec::new(),
+        catch_targets: Vec::new(),
     };
     visitor.visit_function_body(body);
 }
@@ -167,35 +173,72 @@ fn collect_parameter_symbols(params: &FormalParameters<'_>) -> FxHashSet<SymbolI
     set
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 struct State {
     fresh_var: FxHashSet<TrackedValue>,
     outdated_var: FxHashSet<TrackedValue>,
     fresh_prop: FxHashSet<TrackedValue>,
     outdated_prop: FxHashSet<TrackedValue>,
+    reachable: bool,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            fresh_var: FxHashSet::default(),
+            outdated_var: FxHashSet::default(),
+            fresh_prop: FxHashSet::default(),
+            outdated_prop: FxHashSet::default(),
+            reachable: true,
+        }
+    }
 }
 
 impl State {
+    fn unreachable() -> Self {
+        Self { reachable: false, ..Self::default() }
+    }
+
     fn outdate(&mut self) {
+        if !self.reachable {
+            return;
+        }
         self.outdated_var.extend(self.fresh_var.drain());
         self.outdated_prop.extend(self.fresh_prop.drain());
     }
 
     fn mark_var_read(&mut self, key: TrackedValue) {
+        if !self.reachable {
+            return;
+        }
         self.outdated_var.remove(&key);
         self.fresh_var.insert(key);
     }
 
     fn mark_prop_read(&mut self, key: TrackedValue) {
+        if !self.reachable {
+            return;
+        }
         self.outdated_prop.remove(&key);
         self.fresh_prop.insert(key);
     }
 
     fn merge(&mut self, other: State) {
+        if !other.reachable {
+            return;
+        }
+        if !self.reachable {
+            *self = other;
+            return;
+        }
         self.fresh_var.extend(other.fresh_var);
         self.outdated_var.extend(other.outdated_var);
         self.fresh_prop.extend(other.fresh_prop);
         self.outdated_prop.extend(other.outdated_prop);
+    }
+
+    fn mark_unreachable(&mut self) {
+        self.reachable = false;
     }
 }
 
@@ -212,6 +255,49 @@ struct AtomicVisitor<'a, 'b> {
     parameter_symbols: FxHashSet<SymbolId>,
     allow_properties: bool,
     state: State,
+    break_targets: Vec<FlowTarget>,
+    continue_targets: Vec<FlowTarget>,
+    pending_loop_label: Option<String>,
+    abrupt_states: Vec<AbruptState>,
+    finally_contexts: Vec<FinallyContext>,
+    catch_targets: Vec<State>,
+}
+
+#[derive(Debug, Clone)]
+struct LoopFlow {
+    breaks: State,
+    continues: State,
+}
+
+#[derive(Debug, Clone)]
+struct FlowTarget {
+    label: Option<String>,
+    state: State,
+}
+
+impl FlowTarget {
+    fn new(label: Option<String>) -> Self {
+        Self { label, state: State::unreachable() }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct FinallyContext {
+    break_targets_len: usize,
+    continue_targets_len: usize,
+}
+
+#[derive(Debug, Clone)]
+struct AbruptState {
+    kind: AbruptKind,
+    state: State,
+}
+
+#[derive(Debug, Clone)]
+enum AbruptKind {
+    Break(Option<String>),
+    Continue(Option<String>),
+    ReturnOrThrow,
 }
 
 impl<'a> AtomicVisitor<'a, '_> {
@@ -361,6 +447,169 @@ impl<'a> AtomicVisitor<'a, '_> {
         self.state.merge(snap);
     }
 
+    fn push_loop(&mut self) {
+        let label = self.pending_loop_label.take();
+        self.break_targets.push(FlowTarget::new(label.clone()));
+        self.continue_targets.push(FlowTarget::new(label));
+    }
+
+    fn pop_loop(&mut self) -> LoopFlow {
+        let breaks =
+            self.break_targets.pop().expect("break target stack should contain the current loop");
+        let continues = self
+            .continue_targets
+            .pop()
+            .expect("continue target stack should contain the current loop");
+        LoopFlow { breaks: breaks.state, continues: continues.state }
+    }
+
+    fn push_switch(&mut self) {
+        self.break_targets.push(FlowTarget::new(None));
+    }
+
+    fn pop_switch(&mut self) -> State {
+        self.break_targets
+            .pop()
+            .expect("break target stack should contain the current switch")
+            .state
+    }
+
+    fn push_label(&mut self, label: String) {
+        self.break_targets.push(FlowTarget::new(Some(label)));
+    }
+
+    fn pop_label(&mut self) -> State {
+        self.break_targets.pop().expect("break target stack should contain the current label").state
+    }
+
+    fn merge_break(&mut self, label: Option<&str>, state: State) {
+        if let Some(label) = label {
+            if let Some(target) = self
+                .break_targets
+                .iter_mut()
+                .rev()
+                .find(|target| target.label.as_deref() == Some(label))
+            {
+                target.state.merge(state);
+            }
+        } else if let Some(target) = self.break_targets.last_mut() {
+            target.state.merge(state);
+        }
+    }
+
+    fn merge_continue(&mut self, label: Option<&str>, state: State) {
+        if let Some(label) = label {
+            if let Some(target) = self
+                .continue_targets
+                .iter_mut()
+                .rev()
+                .find(|target| target.label.as_deref() == Some(label))
+            {
+                target.state.merge(state);
+            }
+        } else if let Some(target) = self.continue_targets.last_mut() {
+            target.state.merge(state);
+        }
+    }
+
+    fn break_target_index(&self, label: Option<&str>) -> Option<usize> {
+        if let Some(label) = label {
+            self.break_targets.iter().rposition(|target| target.label.as_deref() == Some(label))
+        } else {
+            self.break_targets.len().checked_sub(1)
+        }
+    }
+
+    fn continue_target_index(&self, label: Option<&str>) -> Option<usize> {
+        if let Some(label) = label {
+            self.continue_targets.iter().rposition(|target| target.label.as_deref() == Some(label))
+        } else {
+            self.continue_targets.len().checked_sub(1)
+        }
+    }
+
+    fn break_crosses_finally(&self, label: Option<&str>) -> bool {
+        let Some(target_index) = self.break_target_index(label) else { return false };
+        self.finally_contexts.iter().rev().any(|context| target_index < context.break_targets_len)
+    }
+
+    fn continue_crosses_finally(&self, label: Option<&str>) -> bool {
+        let Some(target_index) = self.continue_target_index(label) else { return false };
+        self.finally_contexts
+            .iter()
+            .rev()
+            .any(|context| target_index < context.continue_targets_len)
+    }
+
+    fn record_abrupt(&mut self, kind: AbruptKind, state: State) {
+        if !self.finally_contexts.is_empty() {
+            self.abrupt_states.push(AbruptState { kind, state });
+        }
+    }
+
+    fn route_abrupt_state(&mut self, kind: AbruptKind, state: State) {
+        match kind {
+            AbruptKind::Break(label) => {
+                if self.break_crosses_finally(label.as_deref()) {
+                    self.record_abrupt(AbruptKind::Break(label), state);
+                } else {
+                    self.merge_break(label.as_deref(), state);
+                }
+            }
+            AbruptKind::Continue(label) => {
+                if self.continue_crosses_finally(label.as_deref()) {
+                    self.record_abrupt(AbruptKind::Continue(label), state);
+                } else {
+                    self.merge_continue(label.as_deref(), state);
+                }
+            }
+            AbruptKind::ReturnOrThrow => self.record_abrupt(AbruptKind::ReturnOrThrow, state),
+        }
+    }
+
+    fn visit_simple_assignment_object(&mut self, expr: &Expression<'a>) {
+        match expr {
+            Expression::Identifier(_) | Expression::ThisExpression(_) | Expression::Super(_) => {}
+            Expression::StaticMemberExpression(expr) => {
+                self.visit_simple_assignment_object(&expr.object);
+            }
+            Expression::ComputedMemberExpression(expr) => {
+                self.visit_simple_assignment_object(&expr.object);
+                self.visit_expression(&expr.expression);
+            }
+            Expression::PrivateFieldExpression(expr) => {
+                self.visit_simple_assignment_object(&expr.object);
+            }
+            Expression::ParenthesizedExpression(expr) => {
+                self.visit_simple_assignment_object(&expr.expression);
+            }
+            Expression::TSAsExpression(expr) => {
+                self.visit_simple_assignment_object(&expr.expression)
+            }
+            Expression::TSSatisfiesExpression(expr) => {
+                self.visit_simple_assignment_object(&expr.expression);
+            }
+            Expression::TSNonNullExpression(expr) => {
+                self.visit_simple_assignment_object(&expr.expression);
+            }
+            Expression::TSTypeAssertion(expr) => {
+                self.visit_simple_assignment_object(&expr.expression)
+            }
+            _ => self.visit_expression(expr),
+        }
+    }
+
+    fn is_iteration_statement(stmt: &Statement<'a>) -> bool {
+        matches!(
+            stmt,
+            Statement::DoWhileStatement(_)
+                | Statement::ForInStatement(_)
+                | Statement::ForOfStatement(_)
+                | Statement::ForStatement(_)
+                | Statement::WhileStatement(_)
+        )
+    }
+
     fn visit_assignment_lhs(&mut self, target: &AssignmentTarget<'a>, is_compound: bool) {
         match target {
             AssignmentTarget::AssignmentTargetIdentifier(ident) => {
@@ -369,7 +618,11 @@ impl<'a> AtomicVisitor<'a, '_> {
                 }
             }
             AssignmentTarget::ComputedMemberExpression(m) => {
-                self.visit_expression(&m.object);
+                if is_compound {
+                    self.visit_expression(&m.object);
+                } else {
+                    self.visit_simple_assignment_object(&m.object);
+                }
                 self.visit_expression(&m.expression);
                 if is_compound
                     && let Some(key) = self.deepest_object_key(&m.object)
@@ -379,7 +632,11 @@ impl<'a> AtomicVisitor<'a, '_> {
                 }
             }
             AssignmentTarget::StaticMemberExpression(m) => {
-                self.visit_expression(&m.object);
+                if is_compound {
+                    self.visit_expression(&m.object);
+                } else {
+                    self.visit_simple_assignment_object(&m.object);
+                }
                 if is_compound
                     && let Some(key) = self.deepest_object_key(&m.object)
                     && self.tracked_for_prop(&key)
@@ -388,7 +645,11 @@ impl<'a> AtomicVisitor<'a, '_> {
                 }
             }
             AssignmentTarget::PrivateFieldExpression(m) => {
-                self.visit_expression(&m.object);
+                if is_compound {
+                    self.visit_expression(&m.object);
+                } else {
+                    self.visit_simple_assignment_object(&m.object);
+                }
                 if is_compound
                     && let Some(key) = self.deepest_object_key(&m.object)
                     && self.tracked_for_prop(&key)
@@ -402,6 +663,9 @@ impl<'a> AtomicVisitor<'a, '_> {
     }
 
     fn check_assignment_write(&mut self, target: &AssignmentTarget<'a>) {
+        if !self.state.reachable {
+            return;
+        }
         match target {
             AssignmentTarget::AssignmentTargetIdentifier(ident) => {
                 let Some(key) = self.reference_key(ident) else { return };
@@ -473,6 +737,9 @@ impl<'a> AtomicVisitor<'a, '_> {
     }
 
     fn check_expression_write(&mut self, expr: &Expression<'a>) {
+        if !self.state.reachable {
+            return;
+        }
         match expr {
             Expression::Identifier(ident) => {
                 let Some(key) = self.reference_key(ident) else { return };
@@ -565,6 +832,10 @@ impl<'a> Visit<'a> for AtomicVisitor<'a, '_> {
     fn visit_await_expression(&mut self, expr: &AwaitExpression<'a>) {
         self.visit_expression(&expr.argument);
         self.state.outdate();
+        let state = self.snapshot();
+        if let Some(catch_target) = self.catch_targets.last_mut() {
+            catch_target.merge(state);
+        }
     }
 
     fn visit_yield_expression(&mut self, expr: &YieldExpression<'a>) {
@@ -572,6 +843,51 @@ impl<'a> Visit<'a> for AtomicVisitor<'a, '_> {
             self.visit_expression(arg);
         }
         self.state.outdate();
+    }
+
+    fn visit_return_statement(&mut self, stmt: &ReturnStatement<'a>) {
+        if let Some(arg) = &stmt.argument {
+            self.visit_expression(arg);
+        }
+        let state = self.snapshot();
+        self.record_abrupt(AbruptKind::ReturnOrThrow, state);
+        self.state.mark_unreachable();
+    }
+
+    fn visit_throw_statement(&mut self, stmt: &ThrowStatement<'a>) {
+        self.visit_expression(&stmt.argument);
+        let state = self.snapshot();
+        if let Some(catch_target) = self.catch_targets.last_mut() {
+            catch_target.merge(state);
+        } else {
+            self.record_abrupt(AbruptKind::ReturnOrThrow, state);
+        }
+        self.state.mark_unreachable();
+    }
+
+    fn visit_break_statement(&mut self, stmt: &BreakStatement<'a>) {
+        let state = self.snapshot();
+        let label = stmt.label.as_ref().map(|label| label.name.as_str());
+        if self.break_crosses_finally(label) {
+            self.record_abrupt(AbruptKind::Break(label.map(std::borrow::ToOwned::to_owned)), state);
+        } else {
+            self.merge_break(label, state);
+        }
+        self.state.mark_unreachable();
+    }
+
+    fn visit_continue_statement(&mut self, stmt: &ContinueStatement<'a>) {
+        let state = self.snapshot();
+        let label = stmt.label.as_ref().map(|label| label.name.as_str());
+        if self.continue_crosses_finally(label) {
+            self.record_abrupt(
+                AbruptKind::Continue(label.map(std::borrow::ToOwned::to_owned)),
+                state,
+            );
+        } else {
+            self.merge_continue(label, state);
+        }
+        self.state.mark_unreachable();
     }
 
     fn visit_assignment_expression(&mut self, expr: &AssignmentExpression<'a>) {
@@ -610,6 +926,106 @@ impl<'a> Visit<'a> for AtomicVisitor<'a, '_> {
         self.merge(after_cons);
     }
 
+    fn visit_switch_statement(&mut self, stmt: &SwitchStatement<'a>) {
+        self.visit_expression(&stmt.discriminant);
+        let snap = self.snapshot();
+        let mut after_switch = snap.clone();
+        let mut fallthrough = State::unreachable();
+        self.push_switch();
+
+        for case in &stmt.cases {
+            self.restore(snap.clone());
+            if let Some(test) = &case.test {
+                self.visit_expression(test);
+            }
+            self.merge(fallthrough);
+            self.visit_statements(&case.consequent);
+            fallthrough = self.snapshot();
+            after_switch.merge(fallthrough.clone());
+        }
+
+        let breaks = self.pop_switch();
+        after_switch.merge(breaks);
+        self.restore(after_switch);
+    }
+
+    fn visit_labeled_statement(&mut self, stmt: &LabeledStatement<'a>) {
+        let label = stmt.label.name.to_string();
+        if Self::is_iteration_statement(&stmt.body) {
+            let previous = self.pending_loop_label.replace(label);
+            self.visit_statement(&stmt.body);
+            self.pending_loop_label = previous;
+            return;
+        }
+
+        self.push_label(label);
+        self.visit_statement(&stmt.body);
+        let mut after_body = self.snapshot();
+        after_body.merge(self.pop_label());
+        self.restore(after_body);
+    }
+
+    fn visit_try_statement(&mut self, stmt: &TryStatement<'a>) {
+        let abrupt_start = self.abrupt_states.len();
+        let has_finalizer = stmt.finalizer.is_some();
+        if has_finalizer {
+            self.finally_contexts.push(FinallyContext {
+                break_targets_len: self.break_targets.len(),
+                continue_targets_len: self.continue_targets.len(),
+            });
+        }
+        let catch_start = if stmt.handler.is_some() {
+            let index = self.catch_targets.len();
+            self.catch_targets.push(State::unreachable());
+            Some(index)
+        } else {
+            None
+        };
+
+        self.visit_block_statement(&stmt.block);
+        let mut after_try = self.snapshot();
+        let catch_state = catch_start.map(|index| {
+            debug_assert_eq!(index + 1, self.catch_targets.len());
+            self.catch_targets.pop().expect("catch target stack should contain the current handler")
+        });
+        if let (Some(handler), Some(catch_state)) = (&stmt.handler, catch_state) {
+            self.restore(catch_state);
+            self.visit_catch_clause(handler);
+            after_try.merge(self.snapshot());
+        }
+        if has_finalizer {
+            self.finally_contexts
+                .pop()
+                .expect("finally context stack should contain the current finalizer");
+        }
+
+        let Some(finalizer) = &stmt.finalizer else {
+            self.restore(after_try);
+            return;
+        };
+
+        let abrupt_states = self.abrupt_states.split_off(abrupt_start);
+        let mut after_finalizer = State::unreachable();
+        if after_try.reachable {
+            self.restore(after_try);
+            self.visit_block_statement(finalizer);
+            after_finalizer.merge(self.snapshot());
+        }
+
+        for abrupt in abrupt_states {
+            let mut state = abrupt.state;
+            state.reachable = true;
+            self.restore(state);
+            self.visit_block_statement(finalizer);
+            let finalizer_state = self.snapshot();
+            if finalizer_state.reachable {
+                self.route_abrupt_state(abrupt.kind, finalizer_state);
+            }
+        }
+
+        self.restore(after_finalizer);
+    }
+
     fn visit_for_statement(&mut self, stmt: &ForStatement<'a>) {
         if let Some(init) = &stmt.init {
             walk::walk_for_statement_init(self, init);
@@ -618,40 +1034,84 @@ impl<'a> Visit<'a> for AtomicVisitor<'a, '_> {
             self.visit_expression(test);
         }
         let snap = self.snapshot();
+        self.push_loop();
         self.visit_statement(&stmt.body);
+        let mut body_exit = self.snapshot();
+        let flow = self.pop_loop();
+        body_exit.merge(flow.continues);
+        self.restore(body_exit);
         if let Some(update) = &stmt.update {
             self.visit_expression(update);
         }
-        self.merge(snap);
+        let after_iteration = self.snapshot();
+        self.restore(snap);
+        self.merge(after_iteration);
+        self.merge(flow.breaks);
     }
 
     fn visit_while_statement(&mut self, stmt: &WhileStatement<'a>) {
         self.visit_expression(&stmt.test);
         let snap = self.snapshot();
+        self.push_loop();
         self.visit_statement(&stmt.body);
-        self.merge(snap);
+        let mut body_exit = self.snapshot();
+        let flow = self.pop_loop();
+        body_exit.merge(flow.continues);
+        self.restore(snap);
+        self.merge(body_exit);
+        self.merge(flow.breaks);
+    }
+
+    fn visit_do_while_statement(&mut self, stmt: &DoWhileStatement<'a>) {
+        let snap = self.snapshot();
+        self.push_loop();
+        self.visit_statement(&stmt.body);
+        let mut body_exit = self.snapshot();
+        let flow = self.pop_loop();
+        body_exit.merge(flow.continues);
+        self.restore(body_exit);
+        self.visit_expression(&stmt.test);
+        let after_iteration = self.snapshot();
+        self.restore(snap);
+        self.merge(after_iteration);
+        self.merge(flow.breaks);
     }
 
     fn visit_for_in_statement(&mut self, stmt: &ForInStatement<'a>) {
         self.visit_expression(&stmt.right);
         let snap = self.snapshot();
+        self.push_loop();
         walk::walk_for_statement_left(self, &stmt.left);
         self.check_for_statement_left_write(&stmt.left);
         self.visit_statement(&stmt.body);
-        self.merge(snap);
+        let mut iteration_exit = self.snapshot();
+        let flow = self.pop_loop();
+        iteration_exit.merge(flow.continues);
+        self.restore(snap);
+        self.merge(iteration_exit);
+        self.merge(flow.breaks);
     }
 
     fn visit_for_of_statement(&mut self, stmt: &ForOfStatement<'a>) {
         self.visit_expression(&stmt.right);
         let snap = self.snapshot();
+        self.push_loop();
         walk::walk_for_statement_left(self, &stmt.left);
         self.check_for_statement_left_write(&stmt.left);
         self.visit_statement(&stmt.body);
-        self.merge(snap);
+        let mut iteration_exit = self.snapshot();
+        let flow = self.pop_loop();
+        iteration_exit.merge(flow.continues);
+        self.restore(snap);
+        self.merge(iteration_exit);
+        self.merge(flow.breaks);
     }
 
     fn visit_statements(&mut self, stmts: &oxc_allocator::Vec<'a, Statement<'a>>) {
         for stmt in stmts {
+            if !self.state.reachable {
+                break;
+            }
             self.visit_statement(stmt);
         }
     }
@@ -770,6 +1230,17 @@ fn test() {
                     ",
             None,
         ),
+        ("let foo; async function x() { if (foo) { await bar; return; } foo = 1; }", None),
+        ("let foo; async function x() { if (foo) { throw await bar; } foo = 1; }", None),
+        (
+            "let foo; async function x() { while (cond) { if (foo) { await bar; continue; } foo = 1; } }",
+            None,
+        ),
+        (
+            "let foo; async function x() { while (cond) { if (foo) { await bar; break; } foo = 1; } }",
+            None,
+        ),
+        ("let foo = {}; async function x() { foo.bar = await baz; foo = 1; }", None),
         (
             "
                             async function a(foo) {
@@ -922,6 +1393,31 @@ fn test() {
         ("let foo; async function x() { if (foo) await bar; ({foo} = obj); }", None),
         ("let foo; async function x() { if (foo) await bar; for (foo of xs) {} }", None),
         ("let foo; async function x() { if (foo) { foo = await bar; foo = 1; } }", None),
+        (
+            "let foo; async function x() { while (cond) { if (foo) { await bar; break; } } foo = 1; }",
+            None,
+        ),
+        (
+            "let foo; async function x() { try { if (foo) { await bar; return; } } finally { foo = 1; } }",
+            None,
+        ),
+        (
+            "let foo; async function x() { switch (a) { case 1: if (foo) { await bar; break; } } foo = 1; }",
+            None,
+        ),
+        (
+            "let foo; async function x() { label: { if (foo) { await bar; break label; } } foo = 1; }",
+            None,
+        ),
+        (
+            "let foo; async function x() { label: while (cond) { if (foo) { await bar; break label; } } foo = 1; }",
+            None,
+        ),
+        ("let foo; async function x() { foo; try { await bar; } catch { foo = 1; } }", None),
+        (
+            "let foo; async function x() { while (cond) { try { break; } finally { foo; await bar; } } foo = 1; }",
+            None,
+        ),
     ];
 
     Tester::new(RequireAtomicUpdates::NAME, RequireAtomicUpdates::PLUGIN, pass, fail)

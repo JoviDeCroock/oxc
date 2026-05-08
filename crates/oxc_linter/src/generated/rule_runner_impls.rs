@@ -1338,7 +1338,8 @@ impl RuleRunner for crate::rules::eslint::radix::Radix {
 }
 
 impl RuleRunner for crate::rules::eslint::require_atomic_updates::RequireAtomicUpdates {
-    const NODE_TYPES: Option<&AstTypesBitset> = None;
+    const NODE_TYPES: Option<&AstTypesBitset> =
+        Some(&AstTypesBitset::from_types(&[AstType::ArrowFunctionExpression, AstType::Function]));
     const RUN_FUNCTIONS: RuleRunFunctionsImplemented = RuleRunFunctionsImplemented::Run;
 }
 

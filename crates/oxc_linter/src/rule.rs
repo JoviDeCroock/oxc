@@ -582,6 +582,10 @@ mod test {
             &[Function, ArrowFunctionExpression, TSFunctionType],
         );
         assert_rule_runs_on_node_types(
+            &eslint::require_atomic_updates::RequireAtomicUpdates::default(),
+            &[Function, ArrowFunctionExpression],
+        );
+        assert_rule_runs_on_node_types(
             &import::no_dynamic_require::NoDynamicRequire::default(),
             &[ImportExpression, CallExpression],
         );
