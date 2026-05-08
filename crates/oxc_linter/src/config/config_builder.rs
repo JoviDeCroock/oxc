@@ -559,7 +559,11 @@ impl ConfigStoreBuilder {
 
     /// # Panics
     /// This function will panic if the `oxlintrc` is not valid JSON.
-    pub fn resolve_final_config_file(&self, oxlintrc: Oxlintrc) -> String {
+    pub fn resolve_final_config_file(
+        &self,
+        oxlintrc: Oxlintrc,
+        external_plugin_store: &ExternalPluginStore,
+    ) -> String {
         let mut oxlintrc = oxlintrc;
         let previous_rules = std::mem::take(&mut oxlintrc.rules);
 
@@ -569,7 +573,7 @@ impl ConfigStoreBuilder {
             .map(|r| (get_name(&r.plugin_name, &r.rule_name), r))
             .collect::<rustc_hash::FxHashMap<_, _>>();
 
-        let new_rules = self
+        let mut new_rules = self
             .rules
             .iter()
             .sorted_unstable_by_key(|(r, _)| (r.plugin_name(), r.name()))
@@ -582,7 +586,26 @@ impl ConfigStoreBuilder {
                     .map(|r| r.config.clone())
                     .unwrap_or_default(),
             })
-            .collect();
+            .collect::<Vec<_>>();
+
+        new_rules.extend(self.external_rules.iter().map(|(rule_id, (_, severity))| {
+            let (plugin_name, rule_name) =
+                external_plugin_store.resolve_plugin_rule_names(*rule_id);
+            ESLintRule {
+                plugin_name: plugin_name.to_string(),
+                rule_name: rule_name.to_string(),
+                severity: *severity,
+                config: rule_name_to_rule
+                    .get(&get_name(plugin_name, rule_name))
+                    .map(|r| r.config.clone())
+                    .unwrap_or_default(),
+            }
+        }));
+
+        new_rules.sort_unstable_by(|a, b| {
+            (a.plugin_name.as_str(), a.rule_name.as_str())
+                .cmp(&(b.plugin_name.as_str(), b.rule_name.as_str()))
+        });
 
         oxlintrc.plugins = Some(self.config.plugins);
         oxlintrc.settings.clone_from(&self.config.settings);
@@ -999,6 +1022,47 @@ mod test {
                 "{plugin}/{name} is in the rules list after typescript plugin has been disabled"
             );
         }
+    }
+
+    #[test]
+    fn test_resolve_final_config_file_includes_external_rules() {
+        let oxlintrc = Oxlintrc::from_string(
+            r#"{
+                "jsPlugins": ["eslint-plugin-storybook"],
+                "rules": {
+                    "storybook/no-title-property-in-meta": "error"
+                }
+            }"#,
+        )
+        .unwrap();
+
+        let mut external_plugin_store = ExternalPluginStore::new(true);
+        external_plugin_store.register_plugin(
+            PathBuf::from("node_modules/eslint-plugin-storybook"),
+            "storybook".to_string(),
+            0,
+            vec!["no-title-property-in-meta".to_string()],
+        );
+
+        let mut builder = ConfigStoreBuilder::empty();
+        oxlintrc
+            .rules
+            .override_rules(
+                &mut builder.rules,
+                &mut builder.external_rules,
+                &[],
+                &mut external_plugin_store,
+            )
+            .unwrap();
+
+        let printed = builder.resolve_final_config_file(oxlintrc, &external_plugin_store);
+        let printed: serde_json::Value = serde_json::from_str(&printed).unwrap();
+
+        assert_eq!(
+            printed["rules"]["storybook/no-title-property-in-meta"],
+            serde_json::json!("deny")
+        );
+        assert_eq!(printed["jsPlugins"][0], serde_json::json!("eslint-plugin-storybook"));
     }
 
     #[test]

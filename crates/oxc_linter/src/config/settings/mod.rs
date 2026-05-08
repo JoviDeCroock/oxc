@@ -6,7 +6,7 @@ mod react;
 pub mod vitest;
 
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 
 use self::{
     jest::JestPluginSettings, jsdoc::JSDocPluginSettings, jsx_a11y::JSXA11yPluginSettings,
@@ -41,7 +41,7 @@ pub use self::react::ReactVersion;
 ///   }
 /// }
 /// ```
-#[derive(Debug, Clone, Serialize, Default, JsonSchema, PartialEq)]
+#[derive(Debug, Clone, Default, JsonSchema, PartialEq)]
 pub struct OxlintSettings {
     #[serde(skip)]
     pub json: Option<OxlintSettingsJson>,
@@ -64,6 +64,35 @@ pub struct OxlintSettings {
 
     #[serde(default)]
     pub jest: JestPluginSettings,
+}
+
+impl Serialize for OxlintSettings {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        if let Some(json) = &self.json {
+            return json.serialize(serializer);
+        }
+
+        #[derive(Serialize)]
+        struct WellKnownSettings<'a> {
+            #[serde(rename = "jsx-a11y")]
+            jsx_a11y: &'a JSXA11yPluginSettings,
+            next: &'a NextPluginSettings,
+            react: &'a ReactPluginSettings,
+            jsdoc: &'a JSDocPluginSettings,
+            vitest: &'a VitestPluginSettings,
+            jest: &'a JestPluginSettings,
+        }
+
+        WellKnownSettings {
+            jsx_a11y: &self.jsx_a11y,
+            next: &self.next,
+            react: &self.react,
+            jsdoc: &self.jsdoc,
+            vitest: &self.vitest,
+            jest: &self.jest,
+        }
+        .serialize(serializer)
+    }
 }
 
 #[derive(Deserialize, Default)]
@@ -304,6 +333,24 @@ mod test {
         assert_eq!(raw_json["jsx-a11y"]["polymorphicPropName"], "role");
         assert_eq!(raw_json["unknown-plugin"]["setting"], "value");
         assert_eq!(raw_json["globalSetting"], "value");
+    }
+
+    #[test]
+    fn test_serialize_extra_fields() {
+        let settings = OxlintSettings::deserialize(&serde_json::json!({
+            "better-tailwindcss": {
+                "entryPoint": "packages/assets/tailwind.css"
+            },
+            "jest": {
+                "version": 20
+            }
+        }))
+        .unwrap();
+
+        let serialized = serde_json::to_value(settings).unwrap();
+
+        assert_eq!(serialized["better-tailwindcss"]["entryPoint"], "packages/assets/tailwind.css");
+        assert_eq!(serialized["jest"]["version"], 20);
     }
 
     #[test]
