@@ -889,6 +889,7 @@ mod test {
             "eslint/no-empty-function": ["error", { "allow": ["functions"] }],
             "eslint/no-restricted-imports": ["error", { "paths": ["lodash"] }],
             "eslint/no-warning-comments": ["error", { "terms": ["todo", "fixme"] }],
+            "eslint/consistent-this": ["error", "self"],
             "jest/valid-title": ["error", { "ignoreSpaces": true }],
             "react/forbid-dom-props": ["error", { "forbid": ["id"] }]
         }))

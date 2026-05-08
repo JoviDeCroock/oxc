@@ -1,0 +1,87 @@
+---
+source: crates/oxc_linter/src/tester.rs
+---
+
+  ⚠ eslint(consistent-this): Unexpected alias 'context' for 'this'.
+   ╭─[consistent_this.tsx:1:5]
+ 1 │ var context = this
+   ·     ──────────────
+   ╰────
+
+  ⚠ eslint(consistent-this): Unexpected alias 'context' for 'this'.
+   ╭─[consistent_this.tsx:1:5]
+ 1 │ var context = (this)
+   ·     ────────────────
+   ╰────
+
+  ⚠ eslint(consistent-this): Unexpected alias 'that' for 'this'.
+   ╭─[consistent_this.tsx:1:5]
+ 1 │ var that = this
+   ·     ───────────
+   ╰────
+
+  ⚠ eslint(consistent-this): Unexpected alias 'self' for 'this'.
+   ╭─[consistent_this.tsx:1:15]
+ 1 │ var foo = 42, self = this
+   ·               ───────────
+   ╰────
+
+  ⚠ eslint(consistent-this): Designated alias 'self' is not assigned to 'this'.
+   ╭─[consistent_this.tsx:1:5]
+ 1 │ var self = 42
+   ·     ─────────
+   ╰────
+
+  ⚠ eslint(consistent-this): Designated alias 'self' is not assigned to 'this'.
+   ╭─[consistent_this.tsx:1:5]
+ 1 │ var self
+   ·     ────
+   ╰────
+
+  ⚠ eslint(consistent-this): Designated alias 'self' is not assigned to 'this'.
+   ╭─[consistent_this.tsx:1:5]
+ 1 │ var self; self = 42
+   ·     ────
+   ╰────
+
+  ⚠ eslint(consistent-this): Designated alias 'self' is not assigned to 'this'.
+   ╭─[consistent_this.tsx:1:11]
+ 1 │ var self; self = 42
+   ·           ─────────
+   ╰────
+
+  ⚠ eslint(consistent-this): Unexpected alias 'context' for 'this'.
+   ╭─[consistent_this.tsx:1:1]
+ 1 │ context = this
+   · ──────────────
+   ╰────
+
+  ⚠ eslint(consistent-this): Unexpected alias 'that' for 'this'.
+   ╭─[consistent_this.tsx:1:1]
+ 1 │ that = this
+   · ───────────
+   ╰────
+
+  ⚠ eslint(consistent-this): Unexpected alias 'self' for 'this'.
+   ╭─[consistent_this.tsx:1:1]
+ 1 │ self = this
+   · ───────────
+   ╰────
+
+  ⚠ eslint(consistent-this): Designated alias 'self' is not assigned to 'this'.
+   ╭─[consistent_this.tsx:1:1]
+ 1 │ self += this
+   · ────────────
+   ╰────
+
+  ⚠ eslint(consistent-this): Designated alias 'self' is not assigned to 'this'.
+   ╭─[consistent_this.tsx:1:5]
+ 1 │ var self; (function() { self = this; }())
+   ·     ────
+   ╰────
+
+  ⚠ eslint(consistent-this): Designated alias 'self' is not assigned to 'this'.
+   ╭─[consistent_this.tsx:1:5]
+ 1 │ var self; (function() { self = this; }())
+   ·     ────
+   ╰────
