@@ -175,6 +175,7 @@ pub use crate::rules::eslint::prefer_spread::PreferSpread as EslintPreferSpread;
 pub use crate::rules::eslint::prefer_template::PreferTemplate as EslintPreferTemplate;
 pub use crate::rules::eslint::preserve_caught_error::PreserveCaughtError as EslintPreserveCaughtError;
 pub use crate::rules::eslint::radix::Radix as EslintRadix;
+pub use crate::rules::eslint::require_atomic_updates::RequireAtomicUpdates as EslintRequireAtomicUpdates;
 pub use crate::rules::eslint::require_await::RequireAwait as EslintRequireAwait;
 pub use crate::rules::eslint::require_unicode_regexp::RequireUnicodeRegexp as EslintRequireUnicodeRegexp;
 pub use crate::rules::eslint::require_yield::RequireYield as EslintRequireYield;
@@ -1003,6 +1004,7 @@ pub enum RuleEnum {
     EslintPreferTemplate(EslintPreferTemplate),
     EslintPreserveCaughtError(EslintPreserveCaughtError),
     EslintRadix(EslintRadix),
+    EslintRequireAtomicUpdates(EslintRequireAtomicUpdates),
     EslintRequireAwait(EslintRequireAwait),
     EslintRequireUnicodeRegexp(EslintRequireUnicodeRegexp),
     EslintRequireYield(EslintRequireYield),
@@ -1797,7 +1799,8 @@ const ESLINT_PREFER_SPREAD_ID: usize = ESLINT_PREFER_REST_PARAMS_ID + 1usize;
 const ESLINT_PREFER_TEMPLATE_ID: usize = ESLINT_PREFER_SPREAD_ID + 1usize;
 const ESLINT_PRESERVE_CAUGHT_ERROR_ID: usize = ESLINT_PREFER_TEMPLATE_ID + 1usize;
 const ESLINT_RADIX_ID: usize = ESLINT_PRESERVE_CAUGHT_ERROR_ID + 1usize;
-const ESLINT_REQUIRE_AWAIT_ID: usize = ESLINT_RADIX_ID + 1usize;
+const ESLINT_REQUIRE_ATOMIC_UPDATES_ID: usize = ESLINT_RADIX_ID + 1usize;
+const ESLINT_REQUIRE_AWAIT_ID: usize = ESLINT_REQUIRE_ATOMIC_UPDATES_ID + 1usize;
 const ESLINT_REQUIRE_UNICODE_REGEXP_ID: usize = ESLINT_REQUIRE_AWAIT_ID + 1usize;
 const ESLINT_REQUIRE_YIELD_ID: usize = ESLINT_REQUIRE_UNICODE_REGEXP_ID + 1usize;
 const ESLINT_SORT_IMPORTS_ID: usize = ESLINT_REQUIRE_YIELD_ID + 1usize;
@@ -2686,6 +2689,7 @@ impl RuleEnum {
             Self::EslintPreferTemplate(_) => ESLINT_PREFER_TEMPLATE_ID,
             Self::EslintPreserveCaughtError(_) => ESLINT_PRESERVE_CAUGHT_ERROR_ID,
             Self::EslintRadix(_) => ESLINT_RADIX_ID,
+            Self::EslintRequireAtomicUpdates(_) => ESLINT_REQUIRE_ATOMIC_UPDATES_ID,
             Self::EslintRequireAwait(_) => ESLINT_REQUIRE_AWAIT_ID,
             Self::EslintRequireUnicodeRegexp(_) => ESLINT_REQUIRE_UNICODE_REGEXP_ID,
             Self::EslintRequireYield(_) => ESLINT_REQUIRE_YIELD_ID,
@@ -3597,6 +3601,7 @@ impl RuleEnum {
             Self::EslintPreferTemplate(_) => EslintPreferTemplate::NAME,
             Self::EslintPreserveCaughtError(_) => EslintPreserveCaughtError::NAME,
             Self::EslintRadix(_) => EslintRadix::NAME,
+            Self::EslintRequireAtomicUpdates(_) => EslintRequireAtomicUpdates::NAME,
             Self::EslintRequireAwait(_) => EslintRequireAwait::NAME,
             Self::EslintRequireUnicodeRegexp(_) => EslintRequireUnicodeRegexp::NAME,
             Self::EslintRequireYield(_) => EslintRequireYield::NAME,
@@ -4500,6 +4505,7 @@ impl RuleEnum {
             Self::EslintPreferTemplate(_) => EslintPreferTemplate::CATEGORY,
             Self::EslintPreserveCaughtError(_) => EslintPreserveCaughtError::CATEGORY,
             Self::EslintRadix(_) => EslintRadix::CATEGORY,
+            Self::EslintRequireAtomicUpdates(_) => EslintRequireAtomicUpdates::CATEGORY,
             Self::EslintRequireAwait(_) => EslintRequireAwait::CATEGORY,
             Self::EslintRequireUnicodeRegexp(_) => EslintRequireUnicodeRegexp::CATEGORY,
             Self::EslintRequireYield(_) => EslintRequireYield::CATEGORY,
@@ -5448,6 +5454,7 @@ impl RuleEnum {
             Self::EslintPreferTemplate(_) => EslintPreferTemplate::FIX,
             Self::EslintPreserveCaughtError(_) => EslintPreserveCaughtError::FIX,
             Self::EslintRadix(_) => EslintRadix::FIX,
+            Self::EslintRequireAtomicUpdates(_) => EslintRequireAtomicUpdates::FIX,
             Self::EslintRequireAwait(_) => EslintRequireAwait::FIX,
             Self::EslintRequireUnicodeRegexp(_) => EslintRequireUnicodeRegexp::FIX,
             Self::EslintRequireYield(_) => EslintRequireYield::FIX,
@@ -6378,6 +6385,7 @@ impl RuleEnum {
             Self::EslintPreferTemplate(_) => EslintPreferTemplate::documentation(),
             Self::EslintPreserveCaughtError(_) => EslintPreserveCaughtError::documentation(),
             Self::EslintRadix(_) => EslintRadix::documentation(),
+            Self::EslintRequireAtomicUpdates(_) => EslintRequireAtomicUpdates::documentation(),
             Self::EslintRequireAwait(_) => EslintRequireAwait::documentation(),
             Self::EslintRequireUnicodeRegexp(_) => EslintRequireUnicodeRegexp::documentation(),
             Self::EslintRequireYield(_) => EslintRequireYield::documentation(),
@@ -7794,6 +7802,10 @@ impl RuleEnum {
             }
             Self::EslintRadix(_) => {
                 EslintRadix::config_schema(generator).or_else(|| EslintRadix::schema(generator))
+            }
+            Self::EslintRequireAtomicUpdates(_) => {
+                EslintRequireAtomicUpdates::config_schema(generator)
+                    .or_else(|| EslintRequireAtomicUpdates::schema(generator))
             }
             Self::EslintRequireAwait(_) => EslintRequireAwait::config_schema(generator)
                 .or_else(|| EslintRequireAwait::schema(generator)),
@@ -9745,6 +9757,7 @@ impl RuleEnum {
             Self::EslintPreferTemplate(_) => "eslint",
             Self::EslintPreserveCaughtError(_) => "eslint",
             Self::EslintRadix(_) => "eslint",
+            Self::EslintRequireAtomicUpdates(_) => "eslint",
             Self::EslintRequireAwait(_) => "eslint",
             Self::EslintRequireUnicodeRegexp(_) => "eslint",
             Self::EslintRequireYield(_) => "eslint",
@@ -10935,6 +10948,9 @@ impl RuleEnum {
                 EslintPreserveCaughtError::from_configuration(value)?,
             )),
             Self::EslintRadix(_) => Ok(Self::EslintRadix(EslintRadix::from_configuration(value)?)),
+            Self::EslintRequireAtomicUpdates(_) => Ok(Self::EslintRequireAtomicUpdates(
+                EslintRequireAtomicUpdates::from_configuration(value)?,
+            )),
             Self::EslintRequireAwait(_) => {
                 Ok(Self::EslintRequireAwait(EslintRequireAwait::from_configuration(value)?))
             }
@@ -13076,6 +13092,7 @@ impl RuleEnum {
             Self::EslintPreferTemplate(rule) => rule.to_configuration(),
             Self::EslintPreserveCaughtError(rule) => rule.to_configuration(),
             Self::EslintRadix(rule) => rule.to_configuration(),
+            Self::EslintRequireAtomicUpdates(rule) => rule.to_configuration(),
             Self::EslintRequireAwait(rule) => rule.to_configuration(),
             Self::EslintRequireUnicodeRegexp(rule) => rule.to_configuration(),
             Self::EslintRequireYield(rule) => rule.to_configuration(),
@@ -13871,6 +13888,7 @@ impl RuleEnum {
             Self::EslintPreferTemplate(rule) => rule.run(node, ctx),
             Self::EslintPreserveCaughtError(rule) => rule.run(node, ctx),
             Self::EslintRadix(rule) => rule.run(node, ctx),
+            Self::EslintRequireAtomicUpdates(rule) => rule.run(node, ctx),
             Self::EslintRequireAwait(rule) => rule.run(node, ctx),
             Self::EslintRequireUnicodeRegexp(rule) => rule.run(node, ctx),
             Self::EslintRequireYield(rule) => rule.run(node, ctx),
@@ -14662,6 +14680,7 @@ impl RuleEnum {
             Self::EslintPreferTemplate(rule) => rule.run_once(ctx),
             Self::EslintPreserveCaughtError(rule) => rule.run_once(ctx),
             Self::EslintRadix(rule) => rule.run_once(ctx),
+            Self::EslintRequireAtomicUpdates(rule) => rule.run_once(ctx),
             Self::EslintRequireAwait(rule) => rule.run_once(ctx),
             Self::EslintRequireUnicodeRegexp(rule) => rule.run_once(ctx),
             Self::EslintRequireYield(rule) => rule.run_once(ctx),
@@ -15457,6 +15476,7 @@ impl RuleEnum {
             Self::EslintPreferTemplate(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::EslintPreserveCaughtError(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::EslintRadix(rule) => rule.run_on_jest_node(jest_node, ctx),
+            Self::EslintRequireAtomicUpdates(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::EslintRequireAwait(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::EslintRequireUnicodeRegexp(rule) => rule.run_on_jest_node(jest_node, ctx),
             Self::EslintRequireYield(rule) => rule.run_on_jest_node(jest_node, ctx),
@@ -16354,6 +16374,7 @@ impl RuleEnum {
             Self::EslintPreferTemplate(rule) => rule.should_run(ctx),
             Self::EslintPreserveCaughtError(rule) => rule.should_run(ctx),
             Self::EslintRadix(rule) => rule.should_run(ctx),
+            Self::EslintRequireAtomicUpdates(rule) => rule.should_run(ctx),
             Self::EslintRequireAwait(rule) => rule.should_run(ctx),
             Self::EslintRequireUnicodeRegexp(rule) => rule.should_run(ctx),
             Self::EslintRequireYield(rule) => rule.should_run(ctx),
@@ -17177,6 +17198,7 @@ impl RuleEnum {
             Self::EslintPreferTemplate(_) => EslintPreferTemplate::IS_TSGOLINT_RULE,
             Self::EslintPreserveCaughtError(_) => EslintPreserveCaughtError::IS_TSGOLINT_RULE,
             Self::EslintRadix(_) => EslintRadix::IS_TSGOLINT_RULE,
+            Self::EslintRequireAtomicUpdates(_) => EslintRequireAtomicUpdates::IS_TSGOLINT_RULE,
             Self::EslintRequireAwait(_) => EslintRequireAwait::IS_TSGOLINT_RULE,
             Self::EslintRequireUnicodeRegexp(_) => EslintRequireUnicodeRegexp::IS_TSGOLINT_RULE,
             Self::EslintRequireYield(_) => EslintRequireYield::IS_TSGOLINT_RULE,
@@ -18288,6 +18310,7 @@ impl RuleEnum {
             Self::EslintPreferTemplate(_) => EslintPreferTemplate::VERSION,
             Self::EslintPreserveCaughtError(_) => EslintPreserveCaughtError::VERSION,
             Self::EslintRadix(_) => EslintRadix::VERSION,
+            Self::EslintRequireAtomicUpdates(_) => EslintRequireAtomicUpdates::VERSION,
             Self::EslintRequireAwait(_) => EslintRequireAwait::VERSION,
             Self::EslintRequireUnicodeRegexp(_) => EslintRequireUnicodeRegexp::VERSION,
             Self::EslintRequireYield(_) => EslintRequireYield::VERSION,
@@ -19248,6 +19271,7 @@ impl RuleEnum {
             Self::EslintPreferTemplate(_) => EslintPreferTemplate::HAS_CONFIG,
             Self::EslintPreserveCaughtError(_) => EslintPreserveCaughtError::HAS_CONFIG,
             Self::EslintRadix(_) => EslintRadix::HAS_CONFIG,
+            Self::EslintRequireAtomicUpdates(_) => EslintRequireAtomicUpdates::HAS_CONFIG,
             Self::EslintRequireAwait(_) => EslintRequireAwait::HAS_CONFIG,
             Self::EslintRequireUnicodeRegexp(_) => EslintRequireUnicodeRegexp::HAS_CONFIG,
             Self::EslintRequireYield(_) => EslintRequireYield::HAS_CONFIG,
@@ -20223,6 +20247,7 @@ impl RuleEnum {
             Self::EslintPreferTemplate(rule) => rule.types_info(),
             Self::EslintPreserveCaughtError(rule) => rule.types_info(),
             Self::EslintRadix(rule) => rule.types_info(),
+            Self::EslintRequireAtomicUpdates(rule) => rule.types_info(),
             Self::EslintRequireAwait(rule) => rule.types_info(),
             Self::EslintRequireUnicodeRegexp(rule) => rule.types_info(),
             Self::EslintRequireYield(rule) => rule.types_info(),
@@ -21014,6 +21039,7 @@ impl RuleEnum {
             Self::EslintPreferTemplate(rule) => rule.run_info(),
             Self::EslintPreserveCaughtError(rule) => rule.run_info(),
             Self::EslintRadix(rule) => rule.run_info(),
+            Self::EslintRequireAtomicUpdates(rule) => rule.run_info(),
             Self::EslintRequireAwait(rule) => rule.run_info(),
             Self::EslintRequireUnicodeRegexp(rule) => rule.run_info(),
             Self::EslintRequireYield(rule) => rule.run_info(),
@@ -21827,6 +21853,7 @@ pub static RULES: std::sync::LazyLock<Vec<RuleEnum>> = std::sync::LazyLock::new(
         RuleEnum::EslintPreferTemplate(EslintPreferTemplate::default()),
         RuleEnum::EslintPreserveCaughtError(EslintPreserveCaughtError::default()),
         RuleEnum::EslintRadix(EslintRadix::default()),
+        RuleEnum::EslintRequireAtomicUpdates(EslintRequireAtomicUpdates::default()),
         RuleEnum::EslintRequireAwait(EslintRequireAwait::default()),
         RuleEnum::EslintRequireUnicodeRegexp(EslintRequireUnicodeRegexp::default()),
         RuleEnum::EslintRequireYield(EslintRequireYield::default()),

@@ -207,6 +207,7 @@ pub(crate) mod eslint {
     pub mod prefer_template;
     pub mod preserve_caught_error;
     pub mod radix;
+    pub mod require_atomic_updates;
     pub mod require_await;
     pub mod require_unicode_regexp;
     pub mod require_yield;

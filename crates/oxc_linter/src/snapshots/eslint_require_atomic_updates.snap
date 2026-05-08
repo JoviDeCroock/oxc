@@ -1,0 +1,301 @@
+---
+source: crates/oxc_linter/src/tester.rs
+---
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:31]
+ 1 │ let foo; async function x() { foo += await amount; }
+   ·                               ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:39]
+ 1 │ if (1); let foo; async function x() { foo += await amount; }
+   ·                                       ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:51]
+ 1 │ let foo; async function x() { while (condition) { foo += await amount; } }
+   ·                                                   ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:31]
+ 1 │ let foo; async function x() { foo = foo + await amount; }
+   ·                               ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:31]
+ 1 │ let foo; async function x() { foo = foo + (bar ? baz : await amount); }
+   ·                               ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:31]
+ 1 │ let foo; async function x() { foo = foo + (bar ? await amount : baz); }
+   ·                               ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:31]
+ 1 │ let foo; async function x() { foo = condition ? foo + await amount : somethingElse; }
+   ·                               ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:31]
+ 1 │ let foo; async function x() { foo = (condition ? foo : await bar) + await bar; }
+   ·                               ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:31]
+ 1 │ let foo; async function x() { foo += bar + await amount; }
+   ·                               ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:47]
+ 1 │ async function x() { let foo; bar(() => foo); foo += await amount; }
+   ·                                               ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:26]
+ 1 │ let foo; function* x() { foo += yield baz }
+   ·                          ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:31]
+ 1 │ let foo; async function x() { foo = bar(foo, await something) }
+   ·                               ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be assigned based on an outdated state
+   ╭─[require_atomic_updates.tsx:1:38]
+ 1 │ const foo = {}; async function x() { foo.bar += await baz }
+   ·                                      ───────
+   ╰────
+  help: Avoid reading a property and writing to it across an `await`/`yield`.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be assigned based on an outdated state
+   ╭─[require_atomic_updates.tsx:1:38]
+ 1 │ const foo = []; async function x() { foo[bar].baz += await result;  }
+   ·                                      ────────────
+   ╰────
+  help: Avoid reading a property and writing to it across an `await`/`yield`.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be assigned based on an outdated state
+   ╭─[require_atomic_updates.tsx:1:48]
+ 1 │ const foo = {}; class C { #bar; async wrap() { foo.#bar += await baz } }
+   ·                                                ────────
+   ╰────
+  help: Avoid reading a property and writing to it across an `await`/`yield`.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:32]
+ 1 │ let foo; async function* x() { foo = (yield foo) + await bar; }
+   ·                                ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:31]
+ 1 │ let foo; async function x() { foo = foo + await result(foo); }
+   ·                               ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:31]
+ 1 │ let foo; async function x() { foo = await result(foo, await somethingElse); }
+   ·                               ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:53]
+ 1 │ function* x() { let foo; yield async function y() { foo += await bar; } }
+   ·                                                     ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:32]
+ 1 │ let foo; async function* x() { foo = await foo + (yield bar); }
+   ·                                ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:31]
+ 1 │ let foo; async function x() { foo = bar + await foo; }
+   ·                               ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be assigned based on an outdated state
+   ╭─[require_atomic_updates.tsx:1:58]
+ 1 │ let foo = {}; async function x() { foo[bar].baz = await (foo.bar += await foo[bar].baz) }
+   ·                                                          ───────
+   ╰────
+  help: Avoid reading a property and writing to it across an `await`/`yield`.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be assigned based on an outdated state
+   ╭─[require_atomic_updates.tsx:1:36]
+ 1 │ let foo = {}; async function x() { foo[bar].baz = await (foo.bar += await foo[bar].baz) }
+   ·                                    ────────────
+   ╰────
+  help: Avoid reading a property and writing to it across an `await`/`yield`.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:36]
+ 1 │ let foo = ''; async function x() { foo += await bar; }
+   ·                                    ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:35]
+ 1 │ let foo = 0; async function x() { foo = (a ? b : foo) + await bar; if (baz); }
+   ·                                   ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:35]
+ 1 │ let foo = 0; async function x() { foo = (a ? b ? c ? d ? foo : e : f : g : h) + await bar; if (baz); }
+   ·                                   ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be assigned based on an outdated state
+   ╭─[require_atomic_updates.tsx:4:33]
+ 3 │                                 let buz = await get(foo.id);
+ 4 │                                 foo.bar = buz.bar;
+   ·                                 ───────
+ 5 │                             }
+   ╰────
+  help: Avoid reading a property and writing to it across an `await`/`yield`.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be assigned based on an outdated state
+   ╭─[require_atomic_updates.tsx:4:37]
+ 3 │                                 if (foo.bar) {
+ 4 │                                     foo.bar = await something;
+   ·                                     ───────
+ 5 │                                 }
+   ╰────
+  help: Avoid reading a property and writing to it across an `await`/`yield`.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be assigned based on an outdated state
+   ╭─[require_atomic_updates.tsx:5:33]
+ 4 │                                 yield something;
+ 5 │                                 foo.bar = 1;
+   ·                                 ───────
+ 6 │                             }
+   ╰────
+  help: Avoid reading a property and writing to it across an `await`/`yield`.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be assigned based on an outdated state
+   ╭─[require_atomic_updates.tsx:4:37]
+ 3 │                                 if (foo.bar) {
+ 4 │                                     foo.bar = await something;
+   ·                                     ───────
+ 5 │                                 }
+   ╰────
+  help: Avoid reading a property and writing to it across an `await`/`yield`.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be assigned based on an outdated state
+   ╭─[require_atomic_updates.tsx:5:33]
+ 4 │                                 yield something;
+ 5 │                                 foo.bar = 1;
+   ·                                 ───────
+ 6 │                             }
+   ╰────
+  help: Avoid reading a property and writing to it across an `await`/`yield`.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be assigned based on an outdated state
+   ╭─[require_atomic_updates.tsx:4:37]
+ 3 │                                 if (foo.bar) {
+ 4 │                                     foo.bar = await something;
+   ·                                     ───────
+ 5 │                                 }
+   ╰────
+  help: Avoid reading a property and writing to it across an `await`/`yield`.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be assigned based on an outdated state
+   ╭─[require_atomic_updates.tsx:5:33]
+ 4 │                                 yield something;
+ 5 │                                 foo.bar = 1;
+   ·                                 ───────
+ 6 │                             }
+   ╰────
+  help: Avoid reading a property and writing to it across an `await`/`yield`.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:5:37]
+ 4 │                                 if (foo) {
+ 5 │                                     foo = await something;
+   ·                                     ───
+ 6 │                                 }
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:6:33]
+ 5 │                                 yield something;
+ 6 │                                 foo = 1;
+   ·                                 ───
+ 7 │                             }
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `globalThis` might be assigned based on an outdated state
+   ╭─[require_atomic_updates.tsx:1:49]
+ 1 │ async function x() { globalThis.foo; await bar; globalThis.foo = 1; }
+   ·                                                 ──────────────
+   ╰────
+  help: Avoid reading a property and writing to it across an `await`/`yield`.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:53]
+ 1 │ let foo; async function x() { if (foo) await bar; ({foo} = obj); }
+   ·                                                     ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:56]
+ 1 │ let foo; async function x() { if (foo) await bar; for (foo of xs) {} }
+   ·                                                        ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:42]
+ 1 │ let foo; async function x() { if (foo) { foo = await bar; foo = 1; } }
+   ·                                          ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
+
+  ⚠ eslint(require-atomic-updates): Possible race condition: `foo` might be reassigned based on an outdated value
+   ╭─[require_atomic_updates.tsx:1:59]
+ 1 │ let foo; async function x() { if (foo) { foo = await bar; foo = 1; } }
+   ·                                                           ───
+   ╰────
+  help: Avoid reading the variable before an `await`/`yield` and writing to it afterwards.
