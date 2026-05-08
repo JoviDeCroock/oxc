@@ -1357,11 +1357,17 @@ mod bigint {
         // Inlining them would change which prototype `super` resolves through.
         fold_same("({ ...{ m() { return super.x } } })");
         fold_same("({ __proto__: p2, ...{ __proto__: p1, m() { return super.x } } })");
+        fold_same("({ __proto__: p2, ...{ m(a = super.x) { return a } } })");
+        fold_same("({ __proto__: p2, ...{ __proto__: p1, m() { return eval('super.x') } } })");
         // `super` reachable through an arrow function inside the method also blocks inlining.
         // (Note: a separate optimization simplifies the IIFE itself.)
         fold(
             "({ ...{ m() { return (() => super.x)() } } })",
             "({ ...{ m() { return super.x } } })",
+        );
+        fold(
+            "({ __proto__: p2, ...{ __proto__: p1, m() { return (() => eval('super.x'))() } } })",
+            "({ __proto__: p2, ...{ __proto__: p1, m() { return eval('super.x') } } })",
         );
         // `super` inside a nested method is bound to that nested method's own `[[HomeObject]]`,
         // so the outer method's `[[HomeObject]]` change is irrelevant — safe to inline.

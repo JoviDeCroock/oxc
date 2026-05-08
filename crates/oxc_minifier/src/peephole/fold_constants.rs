@@ -1,6 +1,6 @@
 use oxc_allocator::TakeIn;
 use oxc_ast::ast::*;
-use oxc_ast_visit::Visit;
+use oxc_ast_visit::{Visit, walk::walk_call_expression};
 use oxc_ecmascript::{
     GlobalContext, ToJsString,
     constant_evaluation::{ConstantEvaluation, ConstantValue, DetermineValueType, ValueType},
@@ -718,7 +718,7 @@ impl<'a> PeepholeOptimizations {
                 // Methods that reference `super` carry a `[[HomeObject]]` bound to this
                 // inner object. Inlining them into the outer object would change which
                 // prototype `super` resolves through.
-                if p.method && method_value_uses_super(&p.value) {
+                if p.method && method_value_may_reference_super(&p.value) {
                     return false;
                 }
                 // non-computed __proto__ property sets the prototype of the object instead
@@ -784,11 +784,13 @@ impl<'a> PeepholeOptimizations {
     }
 }
 
-fn method_value_uses_super(value: &Expression<'_>) -> bool {
+fn method_value_may_reference_super(value: &Expression<'_>) -> bool {
     let Expression::FunctionExpression(func) = value else { return false };
-    let Some(body) = &func.body else { return false };
     let mut finder = SuperFinder { found: false };
-    finder.visit_function_body(body);
+    finder.visit_formal_parameters(&func.params);
+    if let Some(body) = &func.body {
+        finder.visit_function_body(body);
+    }
     finder.found
 }
 
@@ -801,9 +803,18 @@ impl<'a> Visit<'a> for SuperFinder {
         self.found = true;
     }
 
+    fn visit_call_expression(&mut self, it: &CallExpression<'a>) {
+        // Direct eval can parse and evaluate `super` in the current method context.
+        if !it.optional && it.callee.is_specific_id("eval") {
+            self.found = true;
+            return;
+        }
+        walk_call_expression(self, it);
+    }
+
     // Non-arrow functions establish their own `[[HomeObject]]` (object methods, getters/setters,
-    // class methods, function expressions/declarations), so any `super` inside them is bound to
-    // that nested function — not to the method we're checking. Arrow functions inherit `super`
-    // from the enclosing method, so the default walk recurses into them.
+    // class methods, function expressions/declarations), so any `super` or direct eval inside them
+    // is bound to that nested function — not to the method we're checking. Arrow functions inherit
+    // `super` from the enclosing method, so the default walk recurses into them.
     fn visit_function(&mut self, _: &Function<'a>, _: ScopeFlags) {}
 }
