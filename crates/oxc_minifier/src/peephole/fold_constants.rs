@@ -1,12 +1,16 @@
 use oxc_allocator::TakeIn;
 use oxc_ast::ast::*;
+use oxc_ast_visit::Visit;
 use oxc_ecmascript::{
     GlobalContext, ToJsString,
     constant_evaluation::{ConstantEvaluation, ConstantValue, DetermineValueType, ValueType},
     side_effects::MayHaveSideEffects,
 };
 use oxc_span::{GetSpan, SPAN};
-use oxc_syntax::operator::{BinaryOperator, LogicalOperator};
+use oxc_syntax::{
+    operator::{BinaryOperator, LogicalOperator},
+    scope::ScopeFlags,
+};
 
 use crate::TraverseCtx;
 
@@ -708,14 +712,20 @@ impl<'a> PeepholeOptimizations {
             ObjectPropertyKind::SpreadProperty(_) => true,
             ObjectPropertyKind::ObjectProperty(p) => {
                 // getters are evaluated when spreading
-                matches!(p.kind, PropertyKind::Init)
-                    && (
-                        // non-computed __proto__ property sets the prototype of the object instead
-                        p.computed
-                            || p.method
-                            || !p.key.is_specific_static_name("__proto__")
-                            || !p.value.may_have_side_effects(ctx)
-                    )
+                if !matches!(p.kind, PropertyKind::Init) {
+                    return false;
+                }
+                // Methods that reference `super` carry a `[[HomeObject]]` bound to this
+                // inner object. Inlining them into the outer object would change which
+                // prototype `super` resolves through.
+                if p.method && method_value_uses_super(&p.value) {
+                    return false;
+                }
+                // non-computed __proto__ property sets the prototype of the object instead
+                p.computed
+                    || p.method
+                    || !p.key.is_specific_static_name("__proto__")
+                    || !p.value.may_have_side_effects(ctx)
             }
         })
     }
@@ -772,4 +782,28 @@ impl<'a> PeepholeOptimizations {
 
         ctx.state.changed = true;
     }
+}
+
+fn method_value_uses_super(value: &Expression<'_>) -> bool {
+    let Expression::FunctionExpression(func) = value else { return false };
+    let Some(body) = &func.body else { return false };
+    let mut finder = SuperFinder { found: false };
+    finder.visit_function_body(body);
+    finder.found
+}
+
+struct SuperFinder {
+    found: bool,
+}
+
+impl<'a> Visit<'a> for SuperFinder {
+    fn visit_super(&mut self, _: &Super) {
+        self.found = true;
+    }
+
+    // Non-arrow functions establish their own `[[HomeObject]]` (object methods, getters/setters,
+    // class methods, function expressions/declarations), so any `super` inside them is bound to
+    // that nested function — not to the method we're checking. Arrow functions inherit `super`
+    // from the enclosing method, so the default walk recurses into them.
+    fn visit_function(&mut self, _: &Function<'a>, _: ScopeFlags) {}
 }
