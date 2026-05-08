@@ -33,6 +33,7 @@ impl Rule for RequireHook {
 #[test]
 fn tests() {
     use crate::tester::Tester;
+    use std::path::PathBuf;
 
     let pass = vec![
         ("describe()", None),
@@ -408,6 +409,32 @@ fn tests() {
             None,
         ),
     ];
+
+    // Regression test for https://github.com/oxc-project/oxc/issues/22160:
+    // the rule should not fire on regular (non-test) source files.
+    let pass: Vec<(&str, Option<serde_json::Value>, Option<serde_json::Value>, Option<PathBuf>)> =
+        pass.into_iter()
+            .map(|(s, c)| (s, c, None, None))
+            .chain([
+                (
+                    "Object.assign(window, { ItemDetailView });",
+                    None,
+                    None,
+                    Some(PathBuf::from("view-detail.jsx")),
+                ),
+                (
+                    "
+                    const initializeCityDatabase = () => {};
+                    initializeCityDatabase();
+                ",
+                    None,
+                    None,
+                    Some(PathBuf::from("city-helpers.ts")),
+                ),
+            ])
+            .collect();
+    let fail: Vec<(&str, Option<serde_json::Value>, Option<serde_json::Value>, Option<PathBuf>)> =
+        fail.into_iter().map(|(s, c)| (s, c, None, None)).collect();
 
     Tester::new(RequireHook::NAME, RequireHook::PLUGIN, pass, fail)
         .with_jest_plugin(true)

@@ -13,8 +13,8 @@ use serde::Deserialize;
 use crate::{
     context::LintContext,
     utils::{
-        JestFnKind, JestGeneralFnKind, PossibleJestNode, get_node_name, is_type_of_jest_fn_call,
-        valid_vitest_fn::is_valid_vitest_call,
+        JestFnKind, JestGeneralFnKind, PossibleJestNode, get_node_name, is_jest_file,
+        is_type_of_jest_fn_call, valid_vitest_fn::is_valid_vitest_call,
     },
 };
 
@@ -150,6 +150,12 @@ pub struct RequireHookConfig {
 
 impl RequireHookConfig {
     pub fn run<'a>(&self, node: &AstNode<'a>, ctx: &LintContext<'a>) {
+        // The rule is only meaningful inside test files. Without this gate it
+        // flags ordinary top-level calls (e.g. `definePageMeta(...)` in a Vue
+        // page or `Object.assign(window, ...)` in a regular module) — see #22160.
+        if !is_jest_file(ctx) {
+            return;
+        }
         match node.kind() {
             AstKind::Program(program) => {
                 self.check_block_body(&program.body, ctx);

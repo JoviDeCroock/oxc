@@ -33,6 +33,7 @@ impl Rule for RequireHook {
 #[test]
 fn tests() {
     use crate::tester::Tester;
+    use std::path::PathBuf;
 
     let mut pass = vec![
         ("describe()", None),
@@ -710,6 +711,36 @@ fn tests() {
 
     pass.extend(vitest_pass);
     fail.extend(vitest_fail);
+
+    // Convert to 4-tuples and append non-test-file cases to ensure the rule
+    // does not fire on regular source files (regression test for #22160).
+    let mut pass: Vec<(
+        &str,
+        Option<serde_json::Value>,
+        Option<serde_json::Value>,
+        Option<PathBuf>,
+    )> = pass.into_iter().map(|(s, c)| (s, c, None, None)).collect();
+    let fail: Vec<(&str, Option<serde_json::Value>, Option<serde_json::Value>, Option<PathBuf>)> =
+        fail.into_iter().map(|(s, c)| (s, c, None, None)).collect();
+
+    pass.extend(vec![
+        ("definePageMeta({ layout: 'page' })", None, None, Some(PathBuf::from("account.vue"))),
+        (
+            "Object.assign(window, { ItemDetailView });",
+            None,
+            None,
+            Some(PathBuf::from("view-detail.jsx")),
+        ),
+        (
+            "
+                const initializeCityDatabase = () => {};
+                initializeCityDatabase();
+            ",
+            None,
+            None,
+            Some(PathBuf::from("city-helpers.ts")),
+        ),
+    ]);
 
     Tester::new(RequireHook::NAME, RequireHook::PLUGIN, pass, fail)
         .with_vitest_plugin(true)
