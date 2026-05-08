@@ -3,7 +3,7 @@ use oxc_semantic::AstNode;
 use serde::Deserialize;
 
 use crate::{
-    context::LintContext,
+    context::{ContextHost, LintContext},
     rule::{DefaultRuleConfig, Rule},
     rules::shared::require_hook::{DOCUMENTATION, RequireHookConfig},
 };
@@ -27,6 +27,10 @@ impl Rule for RequireHook {
 
     fn run<'a>(&self, node: &AstNode<'a>, ctx: &LintContext<'a>) {
         self.0.run(node, ctx);
+    }
+
+    fn should_run(&self, ctx: &ContextHost) -> bool {
+        self.0.should_run(ctx)
     }
 }
 
@@ -431,10 +435,71 @@ fn tests() {
                     None,
                     Some(PathBuf::from("city-helpers.ts")),
                 ),
+                (
+                    "
+                    function setup() {}
+                    function test() {}
+                    setup();
+                    test();
+                ",
+                    None,
+                    None,
+                    Some(PathBuf::from("city-helpers.ts")),
+                ),
+                (
+                    "
+                    import type { TestContext } from '@jest/globals';
+                    setup();
+                ",
+                    None,
+                    None,
+                    Some(PathBuf::from("city-helpers.ts")),
+                ),
             ])
             .collect();
     let fail: Vec<(&str, Option<serde_json::Value>, Option<serde_json::Value>, Option<PathBuf>)> =
-        fail.into_iter().map(|(s, c)| (s, c, None, None)).collect();
+        fail.into_iter()
+            .map(|(s, c)| (s, c, None, None))
+            .chain([
+                (
+                    "
+                    import { test } from '@jest/globals';
+                    setup();
+                    test('works', () => {});
+                ",
+                    None,
+                    None,
+                    Some(PathBuf::from("city.e2e.ts")),
+                ),
+                (
+                    "
+                    import { test } from './fixtures';
+                    setup();
+                    test('works', () => {});
+                ",
+                    None,
+                    None,
+                    Some(PathBuf::from("city.e2e.ts")),
+                ),
+                (
+                    "setup();
+test('works', () => {});",
+                    None,
+                    None,
+                    Some(PathBuf::from("city.e2e.ts")),
+                ),
+                (
+                    "
+                    const { test } = require('@jest/globals');
+                    setup();
+                    test('works', () => {});
+                ",
+                    None,
+                    None,
+                    Some(PathBuf::from("city.e2e.ts")),
+                ),
+            ])
+            .collect();
 
     Tester::new(RequireHook::NAME, RequireHook::PLUGIN, pass, fail)
         .with_jest_plugin(true)

@@ -155,3 +155,38 @@ source: crates/oxc_linter/src/tester.rs
  15 │                 });
     ╰────
   help: This should be done within a hook
+
+  ⚠ jest(require-hook): Require setup and teardown code to be within a hook.
+   ╭─[require_hook.tsx:3:21]
+ 2 │                     import { test } from '@jest/globals';
+ 3 │                     setup();
+   ·                     ───────
+ 4 │                     test('works', () => {});
+   ╰────
+  help: This should be done within a hook
+
+  ⚠ jest(require-hook): Require setup and teardown code to be within a hook.
+   ╭─[require_hook.tsx:3:21]
+ 2 │                     import { test } from './fixtures';
+ 3 │                     setup();
+   ·                     ───────
+ 4 │                     test('works', () => {});
+   ╰────
+  help: This should be done within a hook
+
+  ⚠ jest(require-hook): Require setup and teardown code to be within a hook.
+   ╭─[require_hook.tsx:1:1]
+ 1 │ setup();
+   · ───────
+ 2 │ test('works', () => {});
+   ╰────
+  help: This should be done within a hook
+
+  ⚠ jest(require-hook): Require setup and teardown code to be within a hook.
+   ╭─[require_hook.tsx:3:21]
+ 2 │                     const { test } = require('@jest/globals');
+ 3 │                     setup();
+   ·                     ───────
+ 4 │                     test('works', () => {});
+   ╰────
+  help: This should be done within a hook

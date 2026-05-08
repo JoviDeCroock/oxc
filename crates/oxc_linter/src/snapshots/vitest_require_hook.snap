@@ -291,3 +291,38 @@ source: crates/oxc_linter/src/tester.rs
  35 │ 
     ╰────
   help: This should be done within a hook
+
+  ⚠ vitest(require-hook): Require setup and teardown code to be within a hook.
+   ╭─[require_hook.tsx:3:13]
+ 2 │             import { test } from 'vitest';
+ 3 │             setup();
+   ·             ───────
+ 4 │             test('works', () => {});
+   ╰────
+  help: This should be done within a hook
+
+  ⚠ vitest(require-hook): Require setup and teardown code to be within a hook.
+   ╭─[require_hook.tsx:3:13]
+ 2 │             import { test } from './fixtures';
+ 3 │             setup();
+   ·             ───────
+ 4 │             test('works', () => {});
+   ╰────
+  help: This should be done within a hook
+
+  ⚠ vitest(require-hook): Require setup and teardown code to be within a hook.
+   ╭─[require_hook.tsx:1:1]
+ 1 │ setup();
+   · ───────
+ 2 │ test('works', () => {});
+   ╰────
+  help: This should be done within a hook
+
+  ⚠ vitest(require-hook): Require setup and teardown code to be within a hook.
+   ╭─[require_hook.tsx:3:13]
+ 2 │             const { test } = require('vitest');
+ 3 │             setup();
+   ·             ───────
+ 4 │             test('works', () => {});
+   ╰────
+  help: This should be done within a hook

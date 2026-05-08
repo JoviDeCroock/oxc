@@ -1,6 +1,6 @@
 use cow_utils::CowUtils;
 use lazy_regex::Regex;
-use std::borrow::Cow;
+use std::{borrow::Cow, path::Path};
 
 use oxc_allocator::GetAddress;
 use oxc_ast::{
@@ -94,21 +94,22 @@ pub enum JestGeneralFnKind {
 
 /// <https://jestjs.io/docs/configuration#testmatch-arraystring>
 pub fn is_jest_file(ctx: &LintContext) -> bool {
-    if ctx.file_path().components().any(|c| match c {
+    is_jest_file_path(ctx.file_path())
+}
+
+/// <https://jestjs.io/docs/configuration#testmatch-arraystring>
+pub fn is_jest_file_path(path: &Path) -> bool {
+    if path.components().any(|c| match c {
         std::path::Component::Normal(p) => p == std::ffi::OsStr::new("__tests__"),
         _ => false,
     }) {
         return true;
     }
 
-    let file_path = ctx.file_path().to_string_lossy();
-    [
-        "spec.js", "spec.jsx", "spec.ts", "spec.tsx", "spec.mjs", "spec.cjs", "spec.mts",
-        "spec.cts", "test.js", "test.jsx", "test.ts", "test.tsx", "test.mjs", "test.cjs",
-        "test.mts", "test.cts",
-    ]
-    .iter()
-    .any(|ext| file_path.ends_with(ext))
+    path.file_name()
+        .and_then(std::ffi::OsStr::to_str)
+        .and_then(|filename| filename.split('.').rev().nth(1))
+        .is_some_and(|name_or_first_ext| name_or_first_ext == "test" || name_or_first_ext == "spec")
 }
 
 pub fn is_type_of_jest_fn_call<'a>(
@@ -384,6 +385,9 @@ mod test {
         };
 
         let ctx = build_ctx("foo.js");
+        assert!(!super::is_jest_file(&ctx));
+
+        let ctx = build_ctx("latest.ts");
         assert!(!super::is_jest_file(&ctx));
 
         let ctx = build_ctx("foo.test.js");

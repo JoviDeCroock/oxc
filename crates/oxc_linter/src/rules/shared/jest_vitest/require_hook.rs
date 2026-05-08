@@ -9,14 +9,19 @@ use oxc_span::Span;
 use oxc_str::CompactStr;
 use schemars::JsonSchema;
 use serde::Deserialize;
+use std::path::Path;
 
 use crate::{
-    context::LintContext,
+    ast_util::is_global_require_call,
+    context::{ContextHost, LintContext},
     utils::{
-        JestFnKind, JestGeneralFnKind, PossibleJestNode, get_node_name, is_jest_file,
+        JestFnKind, JestGeneralFnKind, PossibleJestNode, get_node_name, is_jest_file_path,
         is_type_of_jest_fn_call, valid_vitest_fn::is_valid_vitest_call,
     },
 };
+
+const TEST_FRAMEWORK_GLOBALS: [&str; 10] =
+    ["bench", "describe", "fdescribe", "fit", "it", "suite", "test", "xdescribe", "xit", "xtest"];
 
 fn use_hook(span: Span) -> OxcDiagnostic {
     OxcDiagnostic::warn("Require setup and teardown code to be within a hook.")
@@ -149,13 +154,14 @@ pub struct RequireHookConfig {
 }
 
 impl RequireHookConfig {
+    pub fn should_run(&self, ctx: &ContextHost) -> bool {
+        is_test_file_path(ctx.file_path())
+            || has_test_framework_import(ctx)
+            || has_test_framework_global(ctx)
+            || has_test_framework_require(ctx)
+    }
+
     pub fn run<'a>(&self, node: &AstNode<'a>, ctx: &LintContext<'a>) {
-        // The rule is only meaningful inside test files. Without this gate it
-        // flags ordinary top-level calls (e.g. `definePageMeta(...)` in a Vue
-        // page or `Object.assign(window, ...)` in a regular module) — see #22160.
-        if !is_jest_file(ctx) {
-            return;
-        }
         match node.kind() {
             AstKind::Program(program) => {
                 self.check_block_body(&program.body, ctx);
@@ -234,4 +240,47 @@ impl RequireHookConfig {
             }
         }
     }
+}
+
+fn is_test_file_path(path: &Path) -> bool {
+    is_jest_file_path(path)
+        || path
+            .file_name()
+            .and_then(std::ffi::OsStr::to_str)
+            .and_then(|filename| filename.split('.').rev().nth(1))
+            .is_some_and(|name_or_first_ext| name_or_first_ext == "e2e")
+}
+
+fn has_test_framework_import(ctx: &ContextHost) -> bool {
+    ctx.module_record().import_entries.iter().any(|entry| {
+        !entry.is_type
+            && matches!(entry.module_request.name(), "vitest" | "vite-plus/test" | "@jest/globals")
+    })
+}
+
+fn has_test_framework_require(ctx: &ContextHost) -> bool {
+    if !ctx.semantic().scoping().root_unresolved_references().contains_key("require") {
+        return false;
+    }
+
+    ctx.semantic().nodes().iter().any(|node| {
+        let AstKind::CallExpression(call_expr) = node.kind() else {
+            return false;
+        };
+
+        if !is_global_require_call(call_expr, ctx.semantic()) {
+            return false;
+        }
+
+        let Some(Argument::StringLiteral(module)) = call_expr.arguments.first() else {
+            return false;
+        };
+
+        matches!(module.value.as_str(), "vitest" | "vite-plus/test" | "@jest/globals")
+    })
+}
+
+fn has_test_framework_global(ctx: &ContextHost) -> bool {
+    let root_unresolved_references = ctx.semantic().scoping().root_unresolved_references();
+    TEST_FRAMEWORK_GLOBALS.iter().any(|name| root_unresolved_references.contains_key(*name))
 }

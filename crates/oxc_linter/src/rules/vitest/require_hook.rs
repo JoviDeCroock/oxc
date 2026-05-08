@@ -3,7 +3,7 @@ use oxc_semantic::AstNode;
 use serde::Deserialize;
 
 use crate::{
-    context::LintContext,
+    context::{ContextHost, LintContext},
     rule::{DefaultRuleConfig, Rule},
     rules::shared::require_hook::{DOCUMENTATION, RequireHookConfig},
 };
@@ -27,6 +27,10 @@ impl Rule for RequireHook {
 
     fn run<'a>(&self, node: &AstNode<'a>, ctx: &LintContext<'a>) {
         self.0.run(node, ctx);
+    }
+
+    fn should_run(&self, ctx: &ContextHost) -> bool {
+        self.0.should_run(ctx)
     }
 }
 
@@ -720,8 +724,12 @@ fn tests() {
         Option<serde_json::Value>,
         Option<PathBuf>,
     )> = pass.into_iter().map(|(s, c)| (s, c, None, None)).collect();
-    let fail: Vec<(&str, Option<serde_json::Value>, Option<serde_json::Value>, Option<PathBuf>)> =
-        fail.into_iter().map(|(s, c)| (s, c, None, None)).collect();
+    let mut fail: Vec<(
+        &str,
+        Option<serde_json::Value>,
+        Option<serde_json::Value>,
+        Option<PathBuf>,
+    )> = fail.into_iter().map(|(s, c)| (s, c, None, None)).collect();
 
     pass.extend(vec![
         ("definePageMeta({ layout: 'page' })", None, None, Some(PathBuf::from("account.vue"))),
@@ -740,7 +748,65 @@ fn tests() {
             None,
             Some(PathBuf::from("city-helpers.ts")),
         ),
+        (
+            "
+                function setup() {}
+                function test() {}
+                setup();
+                test();
+            ",
+            None,
+            None,
+            Some(PathBuf::from("city-helpers.ts")),
+        ),
+        (
+            "
+                import type { TestContext } from 'vitest';
+                setup();
+            ",
+            None,
+            None,
+            Some(PathBuf::from("city-helpers.ts")),
+        ),
     ]);
+
+    fail.push((
+        "
+            import { test } from 'vitest';
+            setup();
+            test('works', () => {});
+        ",
+        None,
+        None,
+        Some(PathBuf::from("city.e2e.ts")),
+    ));
+    fail.push((
+        "
+            import { test } from './fixtures';
+            setup();
+            test('works', () => {});
+        ",
+        None,
+        None,
+        Some(PathBuf::from("city.e2e.ts")),
+    ));
+    fail.push((
+        "setup();
+test('works', () => {});",
+        None,
+        None,
+        Some(PathBuf::from("city.e2e.ts")),
+    ));
+    fail.push((
+        "
+            const { test } = require('vitest');
+            setup();
+            test('works', () => {});
+        ",
+        None,
+        None,
+        Some(PathBuf::from("city.e2e.ts")),
+    ));
 
     Tester::new(RequireHook::NAME, RequireHook::PLUGIN, pass, fail)
         .with_vitest_plugin(true)
