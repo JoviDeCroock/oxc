@@ -4,6 +4,7 @@ use oxc_span::GetSpan;
 use crate::{
     ast_nodes::{AstNode, AstNodes},
     formatter::{Formatter, prelude::*, trivia::FormatTrailingComments},
+    parentheses::NeedsParentheses,
     print::{FormatNodeWithoutTrailingComments, FormatWrite},
     write,
 };
@@ -11,10 +12,12 @@ use crate::{
 impl<'a> FormatWrite<'a> for AstNode<'a, TSAsExpression<'a>> {
     fn write(&self, f: &mut Formatter<'_, 'a>) {
         let is_callee_or_object = is_callee_or_object_context(self.span(), self.parent());
+        let needs_parentheses = self.needs_parentheses(f);
         format_as_or_satisfies_expression(
             self.expression(),
             self.type_annotation(),
             is_callee_or_object,
+            needs_parentheses,
             "as",
             f,
         );
@@ -24,10 +27,12 @@ impl<'a> FormatWrite<'a> for AstNode<'a, TSAsExpression<'a>> {
 impl<'a> FormatWrite<'a> for AstNode<'a, TSSatisfiesExpression<'a>> {
     fn write(&self, f: &mut Formatter<'_, 'a>) {
         let is_callee_or_object = is_callee_or_object_context(self.span(), self.parent());
+        let needs_parentheses = self.needs_parentheses(f);
         format_as_or_satisfies_expression(
             self.expression(),
             self.type_annotation(),
             is_callee_or_object,
+            needs_parentheses,
             "satisfies",
             f,
         );
@@ -38,6 +43,7 @@ fn format_as_or_satisfies_expression<'a>(
     expression: &AstNode<'a, Expression>,
     type_annotation: &AstNode<'a, TSType>,
     is_callee_or_object: bool,
+    needs_parentheses: bool,
     operation: &'static str,
     f: &mut Formatter<'_, 'a>,
 ) {
@@ -68,7 +74,17 @@ fn format_as_or_satisfies_expression<'a>(
         }
     });
 
-    if is_callee_or_object {
+    // When the formatter wraps the expression in parentheses and there are leading
+    // line comments on the inner expression (which the auto-`fmt` no longer prints
+    // for `TSAsExpression` / `TSSatisfiesExpression`), the comments must end up
+    // inside the inserted parens. Without `soft_block_indent`, the leading comment
+    // would be glued to the opening paren on the same line (`(// comment\n expr)`),
+    // and oxlint-disable directives could end up applying to the wrong line.
+    let has_leading_comments_in_parens = needs_parentheses
+        && !is_callee_or_object
+        && !f.context().comments().comments_before(expression.span().start).is_empty();
+
+    if is_callee_or_object || has_leading_comments_in_parens {
         write!(f, [group(&soft_block_indent(&format_inner))]);
     } else {
         write!(f, [format_inner]);

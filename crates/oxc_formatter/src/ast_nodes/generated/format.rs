@@ -5454,7 +5454,6 @@ impl<'a> Format<'a> for AstNode<'a, TSAsExpression<'a>> {
         if !is_suppressed && format_type_cast_comment_node(self, false, f) {
             return;
         }
-        self.format_leading_comments(f);
         let needs_parentheses = self.needs_parentheses(f);
         if needs_parentheses {
             "(".fmt(f);
@@ -5477,7 +5476,6 @@ impl<'a> Format<'a> for AstNode<'a, TSSatisfiesExpression<'a>> {
         if !is_suppressed && format_type_cast_comment_node(self, false, f) {
             return;
         }
-        self.format_leading_comments(f);
         let needs_parentheses = self.needs_parentheses(f);
         if needs_parentheses {
             "(".fmt(f);

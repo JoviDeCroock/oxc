@@ -31,7 +31,8 @@ const AST_NODE_WITHOUT_PRINTING_COMMENTS_LIST: &[&str] = &[
     "TemplateElement",
 ];
 
-const AST_NODE_WITHOUT_PRINTING_LEADING_COMMENTS_LIST: &[&str] = &["TSUnionType"];
+const AST_NODE_WITHOUT_PRINTING_LEADING_COMMENTS_LIST: &[&str] =
+    &["TSUnionType", "TSAsExpression", "TSSatisfiesExpression"];
 
 const AST_NODE_NEEDS_PARENTHESES: &[&str] = &[
     "TSTypeAssertion",

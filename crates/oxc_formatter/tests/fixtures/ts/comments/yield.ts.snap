@@ -75,40 +75,52 @@ function* t1() {
 }
 function* t2() {
   yield (
-    // comment
-    (a as any) + 1
+    (
+      // comment
+      a as any
+    ) + 1
   );
 }
 function* t3() {
   yield (
-    // comment
-    (a as any)
+    (
+      // comment
+      a as any
+    )
       ? 0
       : 1
   );
 }
 function* t4() {
   yield (
-    // comment
-    (a as any).b
+    (
+      // comment
+      a as any
+    ).b
   );
 }
 function* t5() {
   yield (
-    // comment
-    (a as any)[a]
+    (
+      // comment
+      a as any
+    )[a]
   );
 }
 function* t6() {
   yield (
-    // comment
-    (a as any)()
+    (
+      // comment
+      a as any
+    )()
   );
 }
 function* t7() {
   yield (
-    // comment
-    (a as any)``
+    (
+      // comment
+      a as any
+    )``
   );
 }
 function* t8() {
@@ -125,8 +137,10 @@ function* t9() {
 }
 function* t10() {
   yield (
-    // comment
-    (a as any)!
+    (
+      // comment
+      a as any
+    )!
   );
 }
 
@@ -141,40 +155,52 @@ function* t1() {
 }
 function* t2() {
   yield (
-    // comment
-    (a as any) + 1
+    (
+      // comment
+      a as any
+    ) + 1
   );
 }
 function* t3() {
   yield (
-    // comment
-    (a as any)
+    (
+      // comment
+      a as any
+    )
       ? 0
       : 1
   );
 }
 function* t4() {
   yield (
-    // comment
-    (a as any).b
+    (
+      // comment
+      a as any
+    ).b
   );
 }
 function* t5() {
   yield (
-    // comment
-    (a as any)[a]
+    (
+      // comment
+      a as any
+    )[a]
   );
 }
 function* t6() {
   yield (
-    // comment
-    (a as any)()
+    (
+      // comment
+      a as any
+    )()
   );
 }
 function* t7() {
   yield (
-    // comment
-    (a as any)``
+    (
+      // comment
+      a as any
+    )``
   );
 }
 function* t8() {
@@ -191,8 +217,10 @@ function* t9() {
 }
 function* t10() {
   yield (
-    // comment
-    (a as any)!
+    (
+      // comment
+      a as any
+    )!
   );
 }
 
