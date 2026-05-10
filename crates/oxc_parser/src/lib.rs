@@ -813,6 +813,11 @@ impl<'a, C: ParserConfig> ParserImpl<'a, C> {
         let original_tokens =
             if self.lexer.config.tokens() { Some(self.lexer.take_tokens()) } else { None };
 
+        // The first parse already populated the module record for these statements.
+        // Suppress module-record updates during the reparse so we don't double-register
+        // exports/imports (which would otherwise produce a spurious "Duplicated export").
+        self.module_record_builder.set_skip_updates(true);
+
         let checkpoints = std::mem::take(&mut self.state.potential_await_reparse);
         for (stmt_index, checkpoint) in checkpoints {
             // Rewind to the checkpoint
@@ -828,6 +833,8 @@ impl<'a, C: ParserConfig> ParserImpl<'a, C> {
                 statements[stmt_index] = stmt;
             }
         }
+
+        self.module_record_builder.set_skip_updates(false);
 
         if let Some(original_tokens) = original_tokens {
             self.lexer.set_tokens(original_tokens);
@@ -1056,6 +1063,43 @@ mod test {
         for source in sources {
             let ret = Parser::new(&allocator, source, source_type).parse();
             assert!(ret.program.source_type.is_script());
+        }
+    }
+
+    // Regression test for https://github.com/oxc-project/oxc/issues/22158
+    // In unambiguous mode, an `export` whose initializer contains a top-level
+    // `await` (initially parsed as identifier) triggers a reparse pass after
+    // ESM is detected. The reparse must not re-register the export, otherwise
+    // the parser reports a spurious "Duplicated export".
+    #[test]
+    fn unambiguous_export_with_await_initializer() {
+        let allocator = Allocator::default();
+        let source_type = SourceType::unambiguous();
+        let sources = [
+            "export var x = await + 1;",
+            "export var x = await(1);",
+            "export var x = await + 0;",
+            "export let y = await + 1;",
+            "export const z = await + 1;",
+        ];
+        for source in sources {
+            let ret = Parser::new(&allocator, source, source_type).parse();
+            assert!(
+                ret.errors.is_empty(),
+                "expected no errors for `{source}`, got: {:?}",
+                ret.errors
+            );
+            assert!(ret.program.source_type.is_module());
+            assert_eq!(
+                ret.module_record.exported_bindings.len(),
+                1,
+                "expected exactly one exported binding for `{source}`",
+            );
+            assert_eq!(
+                ret.module_record.local_export_entries.len(),
+                1,
+                "expected exactly one local export entry for `{source}`",
+            );
         }
     }
 
