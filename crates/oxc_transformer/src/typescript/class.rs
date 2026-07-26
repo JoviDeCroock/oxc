@@ -318,17 +318,12 @@ impl<'a> TypeScript<'a> {
             .body
             .iter()
             .filter_map(|element| match element {
-                ClassElement::PropertyDefinition(prop)
-                    if !prop.r#static
-                        && !prop.declare
-                        && let PropertyKey::StaticIdentifier(ident) = &prop.key =>
-                {
+                ClassElement::PropertyDefinition(prop) if !prop.r#static && !prop.declare => {
+                    let PropertyKey::StaticIdentifier(ident) = &prop.key else { return None };
                     Some(ident.name)
                 }
-                ClassElement::AccessorProperty(prop)
-                    if !prop.r#static
-                        && let PropertyKey::StaticIdentifier(ident) = &prop.key =>
-                {
+                ClassElement::AccessorProperty(prop) if !prop.r#static => {
+                    let PropertyKey::StaticIdentifier(ident) = &prop.key else { return None };
                     Some(ident.name)
                 }
                 _ => None,
